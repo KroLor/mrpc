@@ -1,7 +1,7 @@
 #include "client.h"
 #include <iostream>
 
-PipeClient::PipeClient() : hPipe(INVALID_HANDLE_VALUE), ov{0}, isWriting(false), state(DISCONNECTED) {}
+PipeClient::PipeClient() : hPipe(INVALID_HANDLE_VALUE), ov{0}, ovRead{0}, isWriting(false), state(DISCONNECTED) {}
 
 PipeClient::~PipeClient() { disconnect(); }
 
@@ -13,7 +13,7 @@ bool PipeClient::connect(const char* pipeName) {
     // Пытаемся открыть канал как файл в режиме записи
     hPipe = CreateFileA(
         fullPath.c_str(),
-        GENERIC_WRITE, // Клиент только пишет
+        GENERIC_READ | GENERIC_WRITE,
         0, // Без совместного доступа
         NULL, // Безопасность по умолчанию
         OPEN_EXISTING, // Открываем только если сервер уже создан
@@ -29,18 +29,24 @@ bool PipeClient::connect(const char* pipeName) {
         return false;
     }
 
-    // Создаем событие для отслеживания асинхронной отправки
+    // Создаем событие для отслеживания асинхронных операций
     ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-    if (!ov.hEvent) {
-        disconnect();
-        return false;
-    }
+    ovRead.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 
     state = CONNECTED;
     isWriting = false;
     txBuffer.clear();
+    receivedData.clear();
+    ReadFile(hPipe, buffer, sizeof(buffer), NULL, &ovRead);
     std::cout << "[Client] Connected to server successfully!\n";
     return true;
+}
+
+std::vector<byte> PipeClient::getReceivedData() {
+    if (receivedData.empty()) return {};
+
+    std::vector<byte> output = std::move(receivedData);
+    return output;
 }
 
 bool PipeClient::sendData(const std::vector<byte>& data) {
@@ -54,39 +60,58 @@ void PipeClient::update() {
     if (hPipe == INVALID_HANDLE_VALUE || state != CONNECTED) return;
 
     DWORD bytesTransferred = 0;
+    bool connectionLost = false;
 
-    // Если ОС сейчас занята фоновой отправкой, проверяем её статус
-    if (isWriting) {
+    // Rece
+    while (GetOverlappedResult(hPipe, &ovRead, &bytesTransferred, FALSE)) {
+        if (bytesTransferred > 0) {
+            receivedData.insert(receivedData.end(), buffer, buffer + bytesTransferred);
+        }
+        ResetEvent(ovRead.hEvent);
+        if (!ReadFile(hPipe, buffer, sizeof(buffer), NULL, &ovRead)) {
+            DWORD err = GetLastError();
+            if (err == ERROR_IO_PENDING) {
+                break; // Данные кончились, ОС ждет новые байты в фоне
+            }
+            else if (err == ERROR_BROKEN_PIPE || err == ERROR_NO_DATA) {
+                connectionLost = true;
+                break;
+            }
+        }
+    }
+    if (!connectionLost && GetLastError() == ERROR_BROKEN_PIPE) {
+        connectionLost = true;
+    }
+
+    // Tr
+    if (!connectionLost && isWriting) {
         if (GetOverlappedResult(hPipe, &ov, &bytesTransferred, FALSE)) {
             isWriting = false;
             ResetEvent(ov.hEvent);
         } else {
             DWORD err = GetLastError();
-            if (err == ERROR_IO_INCOMPLETE) {
-                return; // Данные все еще отправляются, ждем следующий update()
-            } else if (err == ERROR_BROKEN_PIPE || err == ERROR_NO_DATA) {
-                std::cout << "[Client] Server disconnected.\n";
-                disconnect();
-                return;
+            if (err != ERROR_IO_INCOMPLETE) {
+                connectionLost = true;
             }
         }
     }
-
-    // Если мы свободны и в очереди txBuffer есть данные - отправляем следующий кусок
-    if (!isWriting && !txBuffer.empty()) {
+    if (!connectionLost && !isWriting && !txBuffer.empty()) {
         if (!WriteFile(hPipe, txBuffer.data(), static_cast<DWORD>(txBuffer.size()), NULL, &ov)) {
             DWORD err = GetLastError();
             if (err == ERROR_IO_PENDING) {
-                // Операция ушла в фон
                 isWriting = true;
-                txBuffer.clear(); // Очищаем локальную очередь, так как ОС забрала данные в обработку
+                txBuffer.clear(); 
             } else {
-                std::cout << "[Client] Write error code: " << err << "\n";
-                disconnect();
+                connectionLost = true;
             }
         } else {
             txBuffer.clear();
         }
+    }
+
+    if (connectionLost) {
+        std::cout << "[Client] Server disconnected.\n";
+        disconnect();
     }
 }
 
@@ -100,7 +125,12 @@ void PipeClient::disconnect() {
         CloseHandle(ov.hEvent);
         ov.hEvent = NULL;
     }
+    if (ovRead.hEvent) {
+        CloseHandle(ovRead.hEvent);
+        ovRead.hEvent = NULL;
+    }
     state = DISCONNECTED;
     isWriting = false;
     txBuffer.clear();
+    receivedData.clear();
 }

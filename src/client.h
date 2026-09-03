@@ -17,11 +17,15 @@ public:
     bool sendData(const std::vector<byte>& data);
     // Закрытие соединения
     void disconnect();
+    std::vector<byte> getReceivedData();
     bool isConnected() const { return state == CONNECTED; }
 
 private:
     HANDLE hPipe;
     OVERLAPPED ov;
+    OVERLAPPED ovRead;
+    BYTE buffer[512];
+    std::vector<byte> receivedData;
     std::vector<byte> txBuffer; // Очередь байт, ожидающих отправки
     bool isWriting;
     enum State { DISCONNECTED, CONNECTED } state;

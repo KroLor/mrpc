@@ -2,11 +2,10 @@
 #include "main.h"
 
 int main() {
-    std::vector<byte> testPacket = { 0x03, 0x00, 10, 20, 30 };
+    std::vector<byte> testPacket1 = { 0x03, 0x00, 10, 20, 30 };
+    std::vector<byte> testPacket2 = { 30, 0x00, 0x03 };
 
-    protocolTesting(&testPacket);
-
-
+    protocolTesting(&testPacket1, &testPacket2);
 
     return 0;
 }
@@ -35,7 +34,31 @@ void sendClient(PipeClient* client, std::vector<byte>* testPacket) {
     client->update();
 }
 
-void protocolTesting(std::vector<byte>* testPacket) {
+void sendServer(PipeServer* server, std::vector<byte>* testPacket) {
+    if (server == nullptr) { return; }
+
+    std::cout << "[Server] Putting packet...\n";
+    
+    server->sendData(*testPacket);
+    server->update();
+}
+
+void receClient(PipeClient* client) {
+    if (client == nullptr) { return; }
+
+    client->update();
+    std::vector<byte> rawBytes = client->getReceivedData();
+
+    if (!rawBytes.empty()) {
+        std::cout << "[Client] Received " << rawBytes.size() << " bytes: ";
+        for (byte b : rawBytes) {
+            std::cout << static_cast<int>(b) << " ";
+        }
+        std::cout << "\n";
+    }
+}
+
+void protocolTesting(std::vector<byte>* testPacket1, std::vector<byte>* testPacket2) {
     PipeServer server;
     server.init("myServer");
     PipeClient client;
@@ -43,9 +66,13 @@ void protocolTesting(std::vector<byte>* testPacket) {
 
     receServer(&server);
 
-    sendClient(&client, testPacket);
+    sendClient(&client, testPacket1);
     Sleep(500);
     receServer(&server);
+    Sleep(500);
+    sendServer(&server, testPacket2);
+    Sleep(500);
+    receClient(&client);
 
     client.disconnect();
     server.close();
