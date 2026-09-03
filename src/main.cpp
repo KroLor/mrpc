@@ -25,7 +25,7 @@ void receServer(PipeServer* server) {
     }
 }
 
-void sendClient(PipeClient* client, std::vector<byte>& testPacket) {
+void sendClient(PipeClient* client, const std::vector<byte>& testPacket) {
     if (client == nullptr) { return; }
 
     std::cout << "[Client] Putting packet...\n";
@@ -34,7 +34,7 @@ void sendClient(PipeClient* client, std::vector<byte>& testPacket) {
     client->update();
 }
 
-void sendServer(PipeServer* server, std::vector<byte>& testPacket) {
+void sendServer(PipeServer* server, const std::vector<byte>& testPacket) {
     if (server == nullptr) { return; }
 
     std::cout << "[Server] Putting packet...\n";
@@ -58,7 +58,7 @@ void receClient(PipeClient* client) {
     }
 }
 
-void protocolTesting(std::vector<byte>& testPacket1, std::vector<byte>& testPacket2) {
+void protocolTesting(const std::vector<byte>& testPacket1, const std::vector<byte>& testPacket2) {
     PipeServer server;
     server.init("myServer");
     PipeClient client;
