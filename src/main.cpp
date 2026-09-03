@@ -1,14 +1,12 @@
-#include <iostream> //
+#include <iostream>
 #include "main.h"
-
-void receServer(PipeServer* server);
-void sendClient(PipeClient* client, std::vector<byte>* testPacket);
-void protocolTesting(std::vector<byte>* testPacket);
 
 int main() {
     std::vector<byte> testPacket = { 0x03, 0x00, 10, 20, 30 };
 
     protocolTesting(&testPacket);
+
+
 
     return 0;
 }
