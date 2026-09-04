@@ -1,79 +1,98 @@
 #include <iostream>
+#include <vector>
 #include "main.h"
 
-int main() {
-    std::vector<byte> testPacket1 = { 0x03, 0x00, 10, 20, 30 };
-    std::vector<byte> testPacket2 = { 30, 0x00, 0x03 };
+extern "C" {
+    #include "FreeRTOS.h"
+    #include "task.h"
+}
 
-    protocolTesting(testPacket1, testPacket2);
+
+
+void WindowsPipeLayer::init(const std::string& pipeName) {
+    server.init(pipeName.c_str());
+    client.connect(pipeName.c_str());
+
+    // Запускаем асинхронную задачу FreeRTOS для постоянного опроса пайпов
+    xTaskCreate(readTaskWrapper, "PipeReadTask", 2048, this, 5, nullptr);
+}
+
+bool WindowsPipeLayer::send(const std::vector<uint8_t>& data) {
+    std::vector<byte> _data(data.begin(), data.end());
+    
+    // Отправляем через клиентский пайп
+    client.sendData(_data);
+    client.update();
+    return true;
+}
+
+// Асинхронная задача FreeRTOS
+void WindowsPipeLayer::readTaskWrapper(void* pvParameters) {
+    auto* self = static_cast<WindowsPipeLayer*>(pvParameters);
+    
+    std::cout << "[System] Задача чтения FreeRTOS запущена.\n";
+
+    for (;;) {
+        // 1. Опрашиваем серверный пайп
+        self->server.update();
+        std::vector<byte> serverBytes = self->server.getReceivedData();
+        
+        if (!serverBytes.empty() && self->onReceive) {
+            std::vector<uint8_t> bytes(serverBytes.begin(), serverBytes.end());
+            // Передаем байты вверх
+            self->onReceive(bytes); 
+        }
+
+        // 2. Опрашиваем клиентский пайп
+        self->client.update();
+        std::vector<byte> clientBytes = self->client.getReceivedData();
+        
+        if (!clientBytes.empty() && self->onReceive) {
+            std::vector<uint8_t> bytes(clientBytes.begin(), clientBytes.end());
+            self->onReceive(bytes);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+void demo(void* pvParameters) {
+    auto* protocol = static_cast<ProtocolEngine*>(pvParameters);
+    
+    std::vector<uint8_t> testPacket1 = { 0x03, 0x00, 10, 20, 30 };
+    std::vector<uint8_t> testPacket2 = { 30, 0x00, 0x03 };
+
+    vTaskDelay(pdMS_TO_TICKS(500)); 
+    
+    protocol->sendPacket(testPacket1);
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    protocol->sendPacket(testPacket2);
+
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+int main() {
+    SetConsoleCP(65001);
+    SetConsoleOutputCP(65001);
+
+    std::cout << "[System] Инициализация физического уровня Windows...\n";
+    
+    static WindowsPipeLayer windowsHardware;
+    windowsHardware.init("myServer");
+
+    // Создаем кроссплатформенный движок протокола и привязываем его к железу
+    static ProtocolEngine protocolEngine("MRPC", windowsHardware);
+
+    // Создаем задачу FreeRTOS, которая будет исполнять тестовый сценарий отправки
+    xTaskCreate(demo, "Demo", 2048, &protocolEngine, 1, nullptr);
+
+    std::cout << "[System] Запуск планировщика FreeRTOS...\n";
+
+    vTaskStartScheduler(); 
 
     return 0;
-}
-
-void receServer(PipeServer* server) {
-    if (server == nullptr) { return; }
-
-    server->update();
-    std::vector<byte> rawBytes = server->getReceivedData();
-
-    if (!rawBytes.empty()) {
-        std::cout << "[Server] Received " << rawBytes.size() << " bytes: ";
-        for (byte b : rawBytes) {
-            std::cout << static_cast<int>(b) << " ";
-        }
-        std::cout << "\n";
-    }
-}
-
-void sendClient(PipeClient* client, const std::vector<byte>& testPacket) {
-    if (client == nullptr) { return; }
-
-    std::cout << "[Client] Putting packet...\n";
-    
-    client->sendData(testPacket);
-    client->update();
-}
-
-void sendServer(PipeServer* server, const std::vector<byte>& testPacket) {
-    if (server == nullptr) { return; }
-
-    std::cout << "[Server] Putting packet...\n";
-    
-    server->sendData(testPacket);
-    server->update();
-}
-
-void receClient(PipeClient* client) {
-    if (client == nullptr) { return; }
-
-    client->update();
-    std::vector<byte> rawBytes = client->getReceivedData();
-
-    if (!rawBytes.empty()) {
-        std::cout << "[Client] Received " << rawBytes.size() << " bytes: ";
-        for (byte b : rawBytes) {
-            std::cout << static_cast<int>(b) << " ";
-        }
-        std::cout << "\n";
-    }
-}
-
-void protocolTesting(const std::vector<byte>& testPacket1, const std::vector<byte>& testPacket2) {
-    PipeServer server;
-    server.init("myServer");
-    PipeClient client;
-    client.connect("myServer");
-
-    receServer(&server);
-
-    sendClient(&client, testPacket1);
-    Sleep(500);
-    receServer(&server);
-    Sleep(500);
-    sendServer(&server, testPacket2);
-    Sleep(500);
-    receClient(&client);
-
-    client.disconnect();
-    server.close();
 }

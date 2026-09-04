@@ -2,9 +2,16 @@
 
 #include "server.h"
 #include "client.h"
+#include "app.h"
 
-void receServer(PipeServer* server);
-void sendClient(PipeClient* client, const std::vector<byte>& testPacket);
-void sendServer(PipeServer* server, const std::vector<byte>& testPacket);
-void receClient(PipeClient* client);
-void protocolTesting(const std::vector<byte>& testPacket1, const std::vector<byte>& testPacket2);
+class WindowsPipeLayer : public PhysicalLayer {
+public:
+    void init(const std::string& pipeName);
+    bool send(const std::vector<uint8_t>& data) override;
+
+private:
+    PipeServer server;
+    PipeClient client;
+
+    static void readTaskWrapper(void* pvParameters);
+};
