@@ -114,6 +114,7 @@ bool rpcEcho(const uint8_t* args, uint16_t argsLen, uint8_t* out, uint16_t* outL
     return true;
 }
 
+// [3.2]
 void clientTask(void* param) {
     App& app = *static_cast<App*>(param);
     
@@ -131,7 +132,7 @@ void clientTask(void* param) {
             std::cout << "[Client] Error! Status: " << static_cast<int>(status) << std::endl;
         }
 
-        vTaskDelay(pdMS_TO_TICKS(2000)); 
+        vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
 
@@ -146,10 +147,10 @@ int main(int argc, char* argv[]) {
     // Создаем физический уровень ForWin
     PhysicsForWin phys("mrpc_pipe", isServer);
     
-    // Создаем узел приложения
+    // Создаем приложение [1]
     App app(phys);
 
-    // 3. Запускаем узел
+    // Запускаем [2]
     if (!app.start()) {
         std::cerr << "[Main] Failed to start App." << std::endl;
         return 2;
@@ -157,16 +158,16 @@ int main(int argc, char* argv[]) {
 
     // Настраиваем роль
     if (isServer) {
-        // Регистрируем функции, которые будут доступны клиенту
+        // Регистрируем функции, которые будут доступны клиенту [3.1]
         app.regFunc("echo", rpcEcho);
         std::cout << "[Server] Registered 'echo'. Waiting for requests..." << std::endl;
     } else {
-        // Запускаем задачу, которая будет слать запросы
+        // Запускаем задачу, которая будет слать запросы [3.2]
         // 8192 / sizeof(StackType_t) - расчет стека для Win32, где StackType_t для Win32 = 4 байта
         xTaskCreate(clientTask, "ClientTask", 8192 / sizeof(StackType_t), &app, 1, NULL);
     }
 
-    // Запускаем планировщик RTOS. 
+    // Запускаем планировщик RTOS [4]
     std::cout << "[Main] Starting FreeRTOS Scheduler..." << std::endl;
     vTaskStartScheduler();
 
