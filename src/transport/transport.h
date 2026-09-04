@@ -85,4 +85,5 @@ private:
     static constexpr uint16_t kMaxMsg = 256;
     uint8_t m_txBuf[kMaxMsg];
     uint8_t m_rxBuf[kMaxMsg];
+    uint8_t m_respBuf[kMaxMsg];
 };

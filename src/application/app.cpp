@@ -84,7 +84,9 @@ void App::rxLoop() {
         m_physics.update();
 
         if (m_physics.isConnected()) {
-            m_transport.dispatchOnce(pollTimeoutMs);
+            if (!m_transport.dispatchOnce(pollTimeoutMs)) {
+                vTaskDelay(pdMS_TO_TICKS(1));
+            }
         } else {
             m_transport.linkDown();
             vTaskDelay(pdMS_TO_TICKS(100));

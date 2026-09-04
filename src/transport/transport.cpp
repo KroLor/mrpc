@@ -164,12 +164,12 @@ void Transport::handleRequest(MsgType type, uint8_t seq, const char* name, const
 
     // Вызываем функцию. Используем m_txBuf как временный буфер для ответа
     uint16_t respLen = kMaxMsg;
-    bool success = handler(args, argsLen, m_txBuf, &respLen);
+    bool success = handler(args, argsLen, m_respBuf, &respLen);
 
     // Отправляем результат
     if (type == MsgType::Request) {
         if (success) {
-            sendMsg(MsgType::Response, seq, "", m_txBuf, respLen);
+            sendMsg(MsgType::Response, seq, "", m_respBuf, respLen);
         } else {
             sendMsg(MsgType::Error, seq, "", nullptr, 0);
         }

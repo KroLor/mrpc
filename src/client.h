@@ -36,4 +36,5 @@ private:
 
     void pumpWrite();
     CRITICAL_SECTION m_cs;
+    std::vector<byte> txWriting;
 };

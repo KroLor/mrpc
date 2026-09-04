@@ -1,7 +1,9 @@
 #include "client.h"
 #include <iostream>
 
-PipeClient::PipeClient() : hPipe(INVALID_HANDLE_VALUE), ov{0}, ovRead{0}, isWriting(false), state(DISCONNECTED) {}
+PipeClient::PipeClient() : hPipe(INVALID_HANDLE_VALUE), ov{0}, ovRead{0}, isWriting(false), state(DISCONNECTED) {
+    InitializeCriticalSection(&m_cs);
+}
 
 PipeClient::~PipeClient() { disconnect(); }
 
@@ -66,17 +68,24 @@ void PipeClient::pumpWrite() {
     if (isWriting) {
         if (GetOverlappedResult(hPipe, &ov, &bytes, FALSE)) {
             isWriting = false;
+            txWriting.clear();
             ResetEvent(ov.hEvent);
         } else if (GetLastError() != ERROR_IO_INCOMPLETE) {
             disconnect(); return;
         }
     }
+
     if (!isWriting && !txBuffer.empty()) {
-        if (!WriteFile(hPipe, txBuffer.data(), (DWORD)txBuffer.size(), NULL, &ov)) {
-            if (GetLastError() == ERROR_IO_PENDING) { isWriting = true; txBuffer.clear(); }
-            else disconnect();
+        txWriting = std::move(txBuffer); 
+        
+        if (!WriteFile(hPipe, txWriting.data(), (DWORD)txWriting.size(), NULL, &ov)) {
+            if (GetLastError() == ERROR_IO_PENDING) { 
+                isWriting = true; 
+            } else {
+                disconnect();
+            }
         } else {
-            txBuffer.clear();
+            txWriting.clear();
         }
     }
 }
@@ -104,10 +113,14 @@ void PipeClient::update() {
             }
         }
     }
+
+    EnterCriticalSection(&m_cs);
+    pumpWrite();
+    LeaveCriticalSection(&m_cs);
+
     if (!connectionLost && GetLastError() == ERROR_BROKEN_PIPE) {
         connectionLost = true;
     }
-
     if (connectionLost) {
         std::cout << "[Client] Server disconnected.\n";
         disconnect();
