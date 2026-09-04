@@ -26,6 +26,8 @@ public:
      * @return Количество реально принятых байт.
      */
     virtual uint16_t recv(uint8_t* data, uint16_t maxSize, uint32_t timeoutMs) = 0;
+
+    virtual void update() = 0;
     
     /**
      * @brief Проверка состояния соединения.

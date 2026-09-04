@@ -81,6 +81,8 @@ void App::rxLoop() {
     const uint32_t pollTimeoutMs = 10; 
 
     for (;;) {
+        m_physics.update();
+
         if (m_physics.isConnected()) {
             m_transport.dispatchOnce(pollTimeoutMs);
         } else {

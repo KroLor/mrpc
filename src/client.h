@@ -22,6 +22,8 @@ public:
 
     bool waitForData(uint32_t timeoutMs);
 
+    bool hasReceivedData() const { return !receivedData.empty(); }
+
 private:
     HANDLE hPipe;
     OVERLAPPED ov;
@@ -31,4 +33,7 @@ private:
     std::vector<byte> txBuffer; // Очередь байт, ожидающих отправки
     bool isWriting;
     enum State { DISCONNECTED, CONNECTED } state;
+
+    void pumpWrite();
+    CRITICAL_SECTION m_cs;
 };

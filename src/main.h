@@ -18,6 +18,8 @@ public:
     bool send(const uint8_t* data, uint16_t len) override;
     uint16_t recv(uint8_t* data, uint16_t maxSize, uint32_t timeoutMs) override;
 
+    void update() override;
+
     bool isConnected() const override;
 
 private:

@@ -106,6 +106,7 @@ bool Channels::poll(uint8_t* out, uint16_t outSize, uint16_t* outLen, uint32_t t
 
         case State::ReadHdrCrc:
             if (byte == m_hdrCrc) {
+                m_pktCrc = updateCrc8(m_pktCrc, byte);
                 m_state = State::WaitData;
             } else {
                 m_state = State::WaitStart; // Ошибка CRC заголовка
@@ -114,6 +115,7 @@ bool Channels::poll(uint8_t* out, uint16_t outSize, uint16_t* outLen, uint32_t t
 
         case State::WaitData:
             if (byte == 0xFB) {
+                m_pktCrc = updateCrc8(m_pktCrc, byte);
                 m_state = State::ReadPayload;
                 m_payloadPos = 0;
             } else {

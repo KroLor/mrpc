@@ -14,9 +14,11 @@ public:
     bool sendData(const std::vector<byte>& data); 
     std::vector<byte> getReceivedData();
 
-    bool isConnected() const { return state == CLIENT_CONNECTED; }
+    bool isConnected() const { return state == WAITING_READ; }
 
     bool waitForData(uint32_t timeoutMs);
+
+    bool hasReceivedData() const { return !receivedData.empty(); }
 
 private:
     HANDLE hPipe;

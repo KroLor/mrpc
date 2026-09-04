@@ -52,8 +52,33 @@ std::vector<byte> PipeClient::getReceivedData() {
 bool PipeClient::sendData(const std::vector<byte>& data) {
     if (state != CONNECTED || data.empty()) return false;
 
+    EnterCriticalSection(&m_cs);
     txBuffer.insert(txBuffer.end(), data.begin(), data.end());
+    pumpWrite();
+    LeaveCriticalSection(&m_cs);
     return true;
+}
+
+void PipeClient::pumpWrite() {
+    if (state != CONNECTED || hPipe == INVALID_HANDLE_VALUE) return;
+
+    DWORD bytes = 0;
+    if (isWriting) {
+        if (GetOverlappedResult(hPipe, &ov, &bytes, FALSE)) {
+            isWriting = false;
+            ResetEvent(ov.hEvent);
+        } else if (GetLastError() != ERROR_IO_INCOMPLETE) {
+            disconnect(); return;
+        }
+    }
+    if (!isWriting && !txBuffer.empty()) {
+        if (!WriteFile(hPipe, txBuffer.data(), (DWORD)txBuffer.size(), NULL, &ov)) {
+            if (GetLastError() == ERROR_IO_PENDING) { isWriting = true; txBuffer.clear(); }
+            else disconnect();
+        } else {
+            txBuffer.clear();
+        }
+    }
 }
 
 void PipeClient::update() {
@@ -81,32 +106,6 @@ void PipeClient::update() {
     }
     if (!connectionLost && GetLastError() == ERROR_BROKEN_PIPE) {
         connectionLost = true;
-    }
-
-    // Tr
-    if (!connectionLost && isWriting) {
-        if (GetOverlappedResult(hPipe, &ov, &bytesTransferred, FALSE)) {
-            isWriting = false;
-            ResetEvent(ov.hEvent);
-        } else {
-            DWORD err = GetLastError();
-            if (err != ERROR_IO_INCOMPLETE) {
-                connectionLost = true;
-            }
-        }
-    }
-    if (!connectionLost && !isWriting && !txBuffer.empty()) {
-        if (!WriteFile(hPipe, txBuffer.data(), static_cast<DWORD>(txBuffer.size()), NULL, &ov)) {
-            DWORD err = GetLastError();
-            if (err == ERROR_IO_PENDING) {
-                isWriting = true;
-                txBuffer.clear(); 
-            } else {
-                connectionLost = true;
-            }
-        } else {
-            txBuffer.clear();
-        }
     }
 
     if (connectionLost) {

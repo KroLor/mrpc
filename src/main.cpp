@@ -9,8 +9,7 @@ PhysicsForWin::PhysicsForWin(const char* pipeName, bool isServer):
     m_isServer(isServer),
     m_server(isServer ? std::make_unique<PipeServer>() : nullptr),
     m_client(isServer ? nullptr : std::make_unique<PipeClient>()),
-    m_init(false)
-{}
+    m_init(false) {}
 
 PhysicsForWin::~PhysicsForWin() {
     deinit();
@@ -59,11 +58,13 @@ bool PhysicsForWin::send(const uint8_t* data, uint16_t len) {
 uint16_t PhysicsForWin::recv(uint8_t* data, uint16_t maxSize, uint32_t timeoutMs) {
     if (!m_init || !data || maxSize == 0) return 0;
 
-    bool hasData = false;
-    if (m_isServer && m_server) {
-        hasData = m_server->waitForData(timeoutMs);
-    } else if (!m_isServer && m_client) {
-        hasData = m_client->waitForData(timeoutMs);
+    if (m_leftover.empty()) {
+        bool hasData = false;
+        if (m_isServer && m_server) {
+            hasData = m_server->waitForData(timeoutMs);
+        } else if (!m_isServer && m_client) {
+            hasData = m_client->waitForData(timeoutMs);
+        }
     }
 
     std::vector<uint8_t> avail;
@@ -87,6 +88,16 @@ uint16_t PhysicsForWin::recv(uint8_t* data, uint16_t maxSize, uint32_t timeoutMs
     }
 
     return copyLen;
+}
+
+void PhysicsForWin::update() {
+    if (!m_init) return;
+    
+    if (m_isServer && m_server) {
+        m_server->update();
+    } else if (m_client) {
+        m_client->update();
+    }
 }
 
 bool PhysicsForWin::isConnected() const {
