@@ -134,3 +134,27 @@ void PipeClient::disconnect() {
     txBuffer.clear();
     receivedData.clear();
 }
+
+bool PipeClient::waitForData(uint32_t timeoutMs) {
+    if (state != CONNECTED || ovRead.hEvent == NULL) return false;
+
+    // Задача RTOS отдает CPU другим задачам
+    if (WaitForSingleObject(ovRead.hEvent, timeoutMs) != WAIT_OBJECT_0) {
+        return false;
+    }
+
+    // Данные пришли
+    DWORD bytesTrans = 0;
+    if (GetOverlappedResult(hPipe, &ovRead, &bytesTrans, FALSE)) {
+        if (bytesTrans > 0) {
+            receivedData.insert(receivedData.end(), buffer, buffer + bytesTrans);
+        }
+        // Сразу перезапускаем чтение
+        ResetEvent(ovRead.hEvent);
+        ReadFile(hPipe, buffer, sizeof(buffer), NULL, &ovRead);
+        return true;
+    }
+
+    disconnect();
+    return false;
+}

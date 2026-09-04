@@ -1,5 +1,5 @@
-#include "server.h"
 #include <iostream>
+#include "server.h"
 
 PipeServer::PipeServer() : hPipe(INVALID_HANDLE_VALUE), ov{0}, ovWrite{0}, isWriting(false), state(WAITING_CONNECT) {}
 
@@ -145,4 +145,34 @@ void PipeServer::close() {
         CloseHandle(ovWrite.hEvent);
         ovWrite.hEvent = NULL;
     }
+}
+
+bool PipeServer::waitForData(uint32_t timeoutMs) {
+    if (state != WAITING_READ || ov.hEvent == NULL) return false;
+
+    if (WaitForSingleObject(ov.hEvent, timeoutMs) != WAIT_OBJECT_0) {
+        return false;
+    }
+
+    DWORD bytesTransferred = 0;
+    if (GetOverlappedResult(hPipe, &ov, &bytesTransferred, FALSE)) {
+        if (bytesTransferred > 0) {
+            receivedData.insert(receivedData.end(), buffer, buffer + bytesTransferred);
+        }
+        ResetEvent(ov.hEvent);
+        ReadFile(hPipe, buffer, sizeof(buffer), NULL, &ov);
+        return true;
+    }
+    
+    // Обрыв связи
+    std::cout << "[Server] Client disconnected_1.\n";
+    DisconnectNamedPipe(hPipe);
+    receivedData.clear();
+    txBuffer.clear();
+    isWriting = false;
+    ResetEvent(ov.hEvent);
+    ResetEvent(ovWrite.hEvent);
+    ConnectNamedPipe(hPipe, &ov);
+    state = WAITING_CONNECT;
+    return false;
 }

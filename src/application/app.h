@@ -48,7 +48,7 @@ public:
      * @return Код статуса выполнения.
      */
     CallStatus call(const char* name, 
-                    const uint8_t* args, uint16_t argsLen,
+                    const uint8_t* args, uint16_t argsLen, 
                     uint8_t* out, uint16_t* outLen, 
                     uint32_t timeoutMs);
 

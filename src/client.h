@@ -20,6 +20,8 @@ public:
     std::vector<byte> getReceivedData();
     bool isConnected() const { return state == CONNECTED; }
 
+    bool waitForData(uint32_t timeoutMs);
+
 private:
     HANDLE hPipe;
     OVERLAPPED ov;

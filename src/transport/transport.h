@@ -75,7 +75,7 @@ private:
     bool m_waitBusy   = false;
     uint8_t m_waitSeq    = 0;
     uint8_t* m_waitBuf    = nullptr;
-    uint16_t m_waitSiz    = 0;
+    uint16_t m_waitSize    = 0;
     uint16_t m_waitGot    = 0;
     CallStatus m_waitStatus = CallStatus::Error;
 
