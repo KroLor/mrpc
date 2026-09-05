@@ -188,6 +188,7 @@ void clientTask(void* param) {
     }
 }
 
+// [4.2]
 // Обработчик чанка стрима
 void StreamChunk(const uint8_t* data, uint16_t len) {
     std::cout << "[Client] Stream: " << std::string((const char*)data, len) << std::endl;
@@ -232,13 +233,15 @@ int main(int argc, char* argv[]) {
         // std::cout << "[Server] Registered 'echo' and 'add'. Waiting for requests..." << std::endl;
 
 
+        // [4.1]
         app.regFunc("echo", rpcEcho);
     } else {
         // Запускаем задачу, которая будет слать запросы [3.2]
         // 8192 / sizeof(StackType_t) - расчет стека для Win32, где StackType_t для Win32 = 4 байта
         // xTaskCreate(clientTask, "ClientTask", 8192 / sizeof(StackType_t), &app, 1, NULL); // Приоритет 1, так как приём важнее отправки
-        
 
+
+        // [4.2]
         xTaskCreate(clientTaskStream, "ClientTaskStream", 8192 / sizeof(StackType_t), &app, 1, NULL);
     }
 
