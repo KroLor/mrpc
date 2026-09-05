@@ -231,11 +231,13 @@ int main(int argc, char* argv[]) {
         // app.regFunc("sum", rpcSum);
         // std::cout << "[Server] Registered 'echo' and 'add'. Waiting for requests..." << std::endl;
 
+
         app.regFunc("echo", rpcEcho);
     } else {
         // Запускаем задачу, которая будет слать запросы [3.2]
         // 8192 / sizeof(StackType_t) - расчет стека для Win32, где StackType_t для Win32 = 4 байта
         // xTaskCreate(clientTask, "ClientTask", 8192 / sizeof(StackType_t), &app, 1, NULL); // Приоритет 1, так как приём важнее отправки
+        
 
         xTaskCreate(clientTaskStream, "ClientTaskStream", 8192 / sizeof(StackType_t), &app, 1, NULL);
     }

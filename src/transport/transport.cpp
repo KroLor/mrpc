@@ -265,17 +265,15 @@ void Transport::handleResponse(MsgType type, uint8_t seq, const uint8_t* payload
 }
 
 void Transport::handleStream(MsgType type, uint8_t seq, const uint8_t* payload, uint16_t payloadLen) {
-    if (m_streamBusy && seq == m_streamSeq) {
-        if (type == MsgType::Stream) {
-            uint16_t copyLen = (payloadLen < MaxMsg) ? payloadLen : MaxMsg;
-            if (copyLen > 0 && payload) {
-                memcpy(m_streamLastBuf, payload, copyLen);
-            }
-            m_streamLastLen = copyLen;
-            m_streamDataReady = true;
-            m_streamStatus = CallStatus::Success; // Cтрим продолжается
+    if (type == MsgType::Stream) {
+        uint16_t copyLen = (payloadLen < MaxMsg) ? payloadLen : MaxMsg;
+        if (copyLen > 0 && payload) {
+            memcpy(m_streamLastBuf, payload, copyLen);
         }
-
-        xSemaphoreGive(m_streamSem);
+        m_streamLastLen = copyLen;
+        m_streamDataReady = true;
+        m_streamStatus = CallStatus::Success; // Cтрим продолжается
     }
+
+    xSemaphoreGive(m_streamSem);
 }
