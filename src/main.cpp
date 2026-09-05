@@ -4,6 +4,8 @@
 #include "main.h"
 #include "app.h"
 
+// For Win //
+
 PhysicsForWin::PhysicsForWin(const char* pipeName, bool isServer): 
     m_pipeName(pipeName ? pipeName : "mrpc_pipe"),
     m_isServer(isServer),
@@ -111,6 +113,8 @@ bool PhysicsForWin::isConnected() const {
     return false;
 }
 
+// For Win //
+
 extern "C" {
     #include "FreeRTOS.h"
     #include "task.h"
@@ -142,7 +146,6 @@ bool rpcSum(const uint8_t* args, uint16_t argsLen, uint8_t* out, uint16_t* outLe
     return true;
 }
 
-// [3.2]
 void clientTask(void* param) {
     App& app = *static_cast<App*>(param);
     
@@ -188,7 +191,6 @@ void clientTask(void* param) {
     }
 }
 
-// [4.2]
 // Обработчик чанка стрима
 void StreamChunk(const uint8_t* data, uint16_t len) {
     std::cout << "[Client] Stream: " << std::string((const char*)data, len) << std::endl;
@@ -205,6 +207,7 @@ void clientTaskStream(void* param) {
     }
 }
 
+// Пример использования
 int main(int argc, char* argv[]) {
     bool isServer = true;
     if (argc == 2 && strcmp(argv[1], "client") == 0) {

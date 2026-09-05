@@ -8,7 +8,7 @@ file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 set(FREERTOS_KERNEL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/FreeRTOS-Kernel")
 
-if(NOT ESP_PLATFORM)
+if(NOT IDF_TARGET)
     list(APPEND SOURCES
         "${FREERTOS_KERNEL_DIR}/tasks.c"
         "${FREERTOS_KERNEL_DIR}/list.c"
@@ -29,7 +29,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE src/freeRTOS_w)
 target_include_directories(${PROJECT_NAME} PRIVATE src/physics)
 target_include_directories(${PROJECT_NAME} PRIVATE src/transport)
 
-if(NOT ESP_PLATFORM)
+if(NOT IDF_TARGET)
     target_include_directories(${PROJECT_NAME} PRIVATE "${FREERTOS_KERNEL_DIR}/include")
     target_include_directories(${PROJECT_NAME} PRIVATE "${FREERTOS_KERNEL_DIR}/portable/MSVC-MingW")
     
