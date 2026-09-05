@@ -188,6 +188,22 @@ void clientTask(void* param) {
     }
 }
 
+// Обработчик чанка стрима
+void StreamChunk(const uint8_t* data, uint16_t len) {
+    std::cout << "[Client] Stream: " << std::string((const char*)data, len) << std::endl;
+}
+void clientTaskStream(void* param) {
+    App& app = *static_cast<App*>(param);
+    const char* msg = "Hello World! _Stream";
+
+    for (;;) {
+        CallStatus status = app.stream("echo", (const uint8_t*)msg, strlen(msg), StreamChunk);
+
+        std::cout << "[Client] Stream finished, status: " << static_cast<int>(status) << std::endl;
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
+
 int main(int argc, char* argv[]) {
     bool isServer = true;
     if (argc == 2 && strcmp(argv[1], "client") == 0) {
@@ -211,13 +227,17 @@ int main(int argc, char* argv[]) {
     // Настраиваем роль
     if (isServer) {
         // Регистрируем функции, которые будут доступны клиенту, задача приема остается [3.1]
+        // app.regFunc("echo", rpcEcho);
+        // app.regFunc("sum", rpcSum);
+        // std::cout << "[Server] Registered 'echo' and 'add'. Waiting for requests..." << std::endl;
+
         app.regFunc("echo", rpcEcho);
-        app.regFunc("sum", rpcSum);
-        std::cout << "[Server] Registered 'echo' and 'add'. Waiting for requests..." << std::endl;
     } else {
         // Запускаем задачу, которая будет слать запросы [3.2]
         // 8192 / sizeof(StackType_t) - расчет стека для Win32, где StackType_t для Win32 = 4 байта
-        xTaskCreate(clientTask, "ClientTask", 8192 / sizeof(StackType_t), &app, 1, NULL); // Приоритет 1, так как приём важнее отправки
+        // xTaskCreate(clientTask, "ClientTask", 8192 / sizeof(StackType_t), &app, 1, NULL); // Приоритет 1, так как приём важнее отправки
+
+        xTaskCreate(clientTaskStream, "ClientTaskStream", 8192 / sizeof(StackType_t), &app, 1, NULL);
     }
 
     // Запускаем планировщик RTOS [4]

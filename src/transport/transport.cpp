@@ -13,6 +13,7 @@ Transport::Transport(Channels& channels) :
     m_seq(0) {
     // Бинарный семафор для ожидания ответа
     m_waitSem = xSemaphoreCreateBinary();
+    m_streamSem = xSemaphoreCreateBinary();
 }
 
 bool Transport::regFunc(const char* name, RpcHandler handler) {
@@ -63,6 +64,43 @@ CallStatus Transport::call(const char* name,
     return m_waitStatus;
 }
 
+CallStatus Transport::stream(const char* name, const uint8_t* args, uint16_t argsLen, StreamCallback Chunk, uint32_t stepTimeoutMs) {
+    if (!name) return CallStatus::InvalidArgs;
+    
+    // Только один стрим одновременно
+    if (m_streamBusy) {
+        return CallStatus::Error;
+    }
+    
+    // Занимаем слот стрима
+    m_streamBusy = true;
+    m_streamSeq = ++m_seq;
+    m_streamStatus = CallStatus::Timeout;
+    m_streamLastLen = 0;
+    
+    // Отправляем stream-запрос (0x0C)
+    if (!sendMsg(MsgType::Stream, m_streamSeq, name, args, argsLen)) {
+        m_streamBusy = false;
+        return CallStatus::Error;
+    }
+    
+    for (;;) {
+        if (xSemaphoreTake(m_streamSem, pdMS_TO_TICKS(stepTimeoutMs)) != pdTRUE) {
+            m_streamStatus = CallStatus::Timeout;
+            break;
+        }
+        if (m_streamDataReady) {
+            m_streamDataReady = false;
+            if (Chunk) Chunk(m_streamLastBuf, m_streamLastLen);
+            continue;
+        }
+        break;
+    }
+    
+    m_streamBusy = false;
+    return m_streamStatus;
+}
+
 bool Transport::dispatchOnce(uint32_t timeoutMs) {
     uint16_t rxLen = 0;
 
@@ -85,9 +123,22 @@ bool Transport::dispatchOnce(uint32_t timeoutMs) {
 
     // Направляем
     if (type == MsgType::Response || type == MsgType::Error) {
-        handleResponse(type, seq, args, argsLen);
-    } else if (type == MsgType::Request || type == MsgType::Stream) {
-        handleRequest(type, seq, name, args, argsLen);
+        if (m_streamBusy && seq == m_streamSeq) {
+            m_streamStatus = (type == MsgType::Response) ? CallStatus::Success : CallStatus::RemoteError;
+            m_streamDataReady = false;
+            xSemaphoreGive(m_streamSem);
+        }
+        else {
+            handleResponse(type, seq, args, argsLen);
+        }
+    }
+    else if (type == MsgType::Stream) {
+        if (m_streamBusy && seq == m_streamSeq) {
+            handleStream(type, seq, args, argsLen);
+        }
+        else {
+            handleRequest(type, seq, name, args, argsLen); 
+        }
     }
 
     return true;
@@ -99,6 +150,12 @@ void Transport::linkDown() {
         m_waitGot = 0;
         // Принудительно будим задачу, которая ждет в call()
         xSemaphoreGive(m_waitSem); 
+    }
+
+    if (m_streamBusy) {
+        m_streamStatus = CallStatus::ChannelDown;
+        m_streamDataReady = false;
+        xSemaphoreGive(m_streamSem);
     }
 }
 
@@ -174,6 +231,17 @@ void Transport::handleRequest(MsgType type, uint8_t seq, const char* name, const
             sendMsg(MsgType::Error, seq, "Error func!", nullptr, 0);
         }
     }
+    else if (type == MsgType::Stream) {
+        if (success) {
+            for (uint8_t i = 0; i < 5; ++i) {
+                sendMsg(MsgType::Stream, seq, "", m_respBuf, respLen);
+                vTaskDelay(pdMS_TO_TICKS(200));
+            }
+            sendMsg(MsgType::Response, seq, "", nullptr, 0); // Конец стрима
+        } else {
+            sendMsg(MsgType::Error, seq, "Error func!", nullptr, 0);
+        }
+    }
 }
 
 void Transport::handleResponse(MsgType type, uint8_t seq, const uint8_t* payload, uint16_t payloadLen) {
@@ -193,5 +261,21 @@ void Transport::handleResponse(MsgType type, uint8_t seq, const uint8_t* payload
         
         // Будим задачу
         xSemaphoreGive(m_waitSem);
+    }
+}
+
+void Transport::handleStream(MsgType type, uint8_t seq, const uint8_t* payload, uint16_t payloadLen) {
+    if (m_streamBusy && seq == m_streamSeq) {
+        if (type == MsgType::Stream) {
+            uint16_t copyLen = (payloadLen < MaxMsg) ? payloadLen : MaxMsg;
+            if (copyLen > 0 && payload) {
+                memcpy(m_streamLastBuf, payload, copyLen);
+            }
+            m_streamLastLen = copyLen;
+            m_streamDataReady = true;
+            m_streamStatus = CallStatus::Success; // Cтрим продолжается
+        }
+
+        xSemaphoreGive(m_streamSem);
     }
 }

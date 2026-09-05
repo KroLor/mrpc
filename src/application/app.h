@@ -53,7 +53,7 @@ public:
                     uint8_t* out, uint16_t* outLen, 
                     uint32_t timeoutMs);
 
-    // bool stream(const char* name, const uint8_t* args, uint16_t argsLen);
+    CallStatus stream(const char* name, const uint8_t* args, uint16_t argsLen, StreamCallback Chunk, uint32_t stepTimeoutMs = 1000);
 
     /**
      * @brief Проверка состояния соединения.

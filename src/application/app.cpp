@@ -64,6 +64,10 @@ CallStatus App::call(const char* name,
     return m_transport.call(name, args, argsLen, out, outLen, timeoutMs);
 }
 
+CallStatus App::stream(const char* name, const uint8_t* args, uint16_t argsLen, StreamCallback Chunk, uint32_t stepTimeoutMs) {
+    return m_transport.stream(name, args, argsLen, Chunk, stepTimeoutMs);
+}
+
 bool App::isConnected() const {
     return m_physics.isConnected();
 }

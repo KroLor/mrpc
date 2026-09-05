@@ -28,6 +28,7 @@ enum class CallStatus {
 };
 
 using RpcHandler = bool (*)(const uint8_t* args, uint16_t argsLen, uint8_t* out, uint16_t* outLen);
+using StreamCallback = void (*)(const uint8_t* data, uint16_t len);
 
 class Transport {
 public:
@@ -40,7 +41,7 @@ public:
                     uint8_t* out, uint16_t* outLen,
                     uint32_t timeoutMs);
 
-    // bool stream(const char* name, const uint8_t* args, uint16_t argsLen);
+    CallStatus stream(const char* name, const uint8_t* args, uint16_t argsLen, StreamCallback Chunk, uint32_t stepTimeoutMs);
 
     // 0x16 - разбудить висящий call() с совпавшим N
     // 0x0B/0x0C - поиск в реестре, вызов, отправка ответ/ошибка
@@ -60,6 +61,8 @@ private:
                        const uint8_t* args, uint16_t argsLen);
     void handleResponse(MsgType type, uint8_t seq,
                         const uint8_t* payload, uint16_t payloadLen);
+    void handleStream(MsgType type, uint8_t seq, const uint8_t* payload, uint16_t payloadLen);
+
 
     Channels& m_channels;
 
@@ -71,6 +74,12 @@ private:
     FuncEntry m_registry[MaxFunctions];
     uint8_t m_regCount = 0;
 
+    uint8_t m_seq = 0;
+    static constexpr uint16_t MaxMsg = 256;
+    uint8_t m_txBuf[MaxMsg];
+    uint8_t m_rxBuf[MaxMsg];
+    uint8_t m_respBuf[MaxMsg];
+
     // Единственный слот исходящего запроса, ожидающего ответа
     SemaphoreHandle_t m_waitSem;
     bool m_waitBusy = false;
@@ -80,9 +89,11 @@ private:
     uint16_t m_waitGot = 0;
     CallStatus m_waitStatus = CallStatus::Error;
 
-    uint8_t m_seq = 0;
-    static constexpr uint16_t MaxMsg = 256;
-    uint8_t m_txBuf[MaxMsg];
-    uint8_t m_rxBuf[MaxMsg];
-    uint8_t m_respBuf[MaxMsg];
+    SemaphoreHandle_t m_streamSem;
+    bool m_streamBusy = false;
+    uint8_t m_streamSeq = 0;
+    uint8_t m_streamLastBuf[MaxMsg];
+    uint16_t m_streamLastLen = 0;
+    CallStatus m_streamStatus = CallStatus::Error;
+    bool m_streamDataReady = false;
 };
