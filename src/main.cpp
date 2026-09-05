@@ -226,8 +226,8 @@ int main(int argc, char* argv[]) {
         app.regFunc("echo", rpcEcho);
         app.regFunc("sum", rpcSum);
     } else {
-        app.startClientStreamTask(clientTaskStream);
-        // app.startClientTask(clientTask);
+        // app.startClientStreamTask(clientTaskStream);
+        app.startClientTask(clientTask);
     }
 
     std::cout << "[Main] Starting FreeRTOS scheduler..." << std::endl;
