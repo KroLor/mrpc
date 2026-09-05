@@ -125,22 +125,63 @@ bool rpcEcho(const uint8_t* args, uint16_t argsLen, uint8_t* out, uint16_t* outL
     return true;
 }
 
+// Тестовая функция "сумма"
+bool rpcSum(const uint8_t* args, uint16_t argsLen, uint8_t* out, uint16_t* outLen) {
+    if (*outLen < sizeof(int)) return false;
+
+    int a, b;
+    memcpy(&a, args, sizeof(int));
+    memcpy(&b, args + sizeof(int), sizeof(int));
+
+    int result = a + b;
+
+    memcpy(out, &result, sizeof(int));
+    *outLen = sizeof(result);
+
+    std::cout << "[Server] add(" << a << ", " << b << ") = " << result << std::endl;
+    return true;
+}
+
 // [3.2]
 void clientTask(void* param) {
     App& app = *static_cast<App*>(param);
     
-    const char* msg = "Hello World!";
-    uint8_t resp[64];
-    uint16_t respLen = sizeof(resp);
+    const char* msg1 = "Hello World!";
+    uint8_t resp1[64];
+    uint16_t respLen1 = sizeof(resp1);
+
+    int a = 10;
+    int b = 25;
+    // Буфер для аргументов
+    uint8_t argsBuf[2 * sizeof(int)];
+    memcpy(argsBuf, &a, sizeof(int));
+    memcpy(argsBuf + sizeof(int), &b, sizeof(int));
+    // Буфер для ответа
+    int result = 0;
+    uint16_t respLen = sizeof(result);
 
     for (;;) {
-        // Вызываем удаленную функцию echo и ждем ответа 1000 мс
-        CallStatus status = app.call("echo", (const uint8_t*)msg, strlen(msg), resp, &respLen, 1000);
+        // 1
 
-        if (status == CallStatus::Success) {
-            std::cout << "[Client] Success: " << std::string((char*)resp, respLen) << std::endl;
+        // Вызываем удаленную функцию echo и ждем ответа 1000 мс
+        CallStatus status1 = app.call("echo", (const uint8_t*)msg1, strlen(msg1), resp1, &respLen1, 1000);
+
+        if (status1 == CallStatus::Success) {
+            std::cout << "[Client] Success: " << std::string((char*)resp1, respLen1) << std::endl;
         } else {
-            std::cout << "[Client] Error! Status: " << static_cast<int>(status) << std::endl;
+            std::cout << "[Client] Error! Status: " << static_cast<int>(status1) << std::endl;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(2000));
+
+        // 2
+
+        CallStatus status2 = app.call("sum", argsBuf, sizeof(argsBuf), (uint8_t*)&result, &respLen, 1000);
+
+        if (status2 == CallStatus::Success && respLen == sizeof(int)) {
+            std::cout << "[Client] Result of add(" << a << ", " << b << "): " << result << std::endl;
+        } else {
+            std::cout << "[Client] Add failed! Status: " << static_cast<int>(status2) << std::endl;
         }
 
         vTaskDelay(pdMS_TO_TICKS(2000));
@@ -169,13 +210,14 @@ int main(int argc, char* argv[]) {
 
     // Настраиваем роль
     if (isServer) {
-        // Регистрируем функции, которые будут доступны клиенту [3.1]
+        // Регистрируем функции, которые будут доступны клиенту, задача приема остается [3.1]
         app.regFunc("echo", rpcEcho);
-        std::cout << "[Server] Registered 'echo'. Waiting for requests..." << std::endl;
+        app.regFunc("sum", rpcSum);
+        std::cout << "[Server] Registered 'echo' and 'add'. Waiting for requests..." << std::endl;
     } else {
         // Запускаем задачу, которая будет слать запросы [3.2]
         // 8192 / sizeof(StackType_t) - расчет стека для Win32, где StackType_t для Win32 = 4 байта
-        xTaskCreate(clientTask, "ClientTask", 8192 / sizeof(StackType_t), &app, 1, NULL);
+        xTaskCreate(clientTask, "ClientTask", 8192 / sizeof(StackType_t), &app, 1, NULL); // Приоритет 1, так как приём важнее отправки
     }
 
     // Запускаем планировщик RTOS [4]

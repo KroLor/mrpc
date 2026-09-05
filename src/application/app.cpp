@@ -25,7 +25,7 @@ bool App::start() {
     const uint32_t stackSizeWords = stackSizeBytes / sizeof(StackType_t);
 
     BaseType_t result = xTaskCreate(
-        rxTaskEntry, // Функция задачи
+        rxTask, // Функция задачи
         "AppRxTask", // Имя для отладчика
         stackSizeWords, // Глубина стека (размер)
         this, // Параметр (указатель на экземпляр App)
@@ -68,7 +68,7 @@ bool App::isConnected() const {
     return m_physics.isConnected();
 }
 
-void App::rxTaskEntry(void* param) {
+void App::rxTask(void* param) {
     App* appInst = static_cast<App*>(param);
 
     appInst->rxLoop();
@@ -85,7 +85,7 @@ void App::rxLoop() {
 
         if (m_physics.isConnected()) {
             if (!m_transport.dispatchOnce(pollTimeoutMs)) {
-                vTaskDelay(pdMS_TO_TICKS(1));
+                vTaskDelay(pdMS_TO_TICKS(1)); // Даем время другим задачам (call() по 1 приоритету)
             }
         } else {
             m_transport.linkDown();

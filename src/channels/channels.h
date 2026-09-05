@@ -20,7 +20,7 @@ public:
      * @param out Буфер для принятой полезной нагрузки.
      * @param outSize Размер буфера out.
      * @param outLen Фактически принятая длина payload.
-     * @param timeoutMs Таймаут ожидания байтов от физики.
+     * @param timeoutMs Таймаут ожидания байтов от physics.
      * @return true если за время таймаута был успешно принят и проверен целый пакет.
      */
     bool poll(uint8_t* out, uint16_t outSize, uint16_t* outLen, uint32_t timeoutMs);

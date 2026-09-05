@@ -19,8 +19,8 @@ public:
     App& operator=(const App&) = delete;
 
     /**
-     * @brief Инициализация и запуск узла.
-     * @return true при успешном создании задачи и инициализации.
+     * @brief Инициализация задачи приема.
+     * @return true при успешном создании задачи.
      */
     bool start();
 
@@ -38,6 +38,7 @@ public:
 
     /**
      * Формирует сообщение 0x0B (запрос), отправляет его и блокирует текущую задачу RTOS.
+     * ("Обеспечить возможность ожидания ответа на отправленный запрос")
      * 
      * @param name Имя удаленной функции.
      * @param args Аргументы вызова.
@@ -60,7 +61,7 @@ public:
     bool isConnected() const;
 
 private:
-    static void rxTaskEntry(void* param);
+    static void rxTask(void* param);
     
     // Основной цикл задачи приема
     void rxLoop();

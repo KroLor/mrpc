@@ -42,7 +42,6 @@ public:
 
     // bool stream(const char* name, const uint8_t* args, uint16_t argsLen);
 
-    // Channels::poll -> Physics::recv, затем:
     // 0x16 - разбудить висящий call() с совпавшим N
     // 0x0B/0x0C - поиск в реестре, вызов, отправка ответ/ошибка
     // true - за итерацию обработано сообщение
@@ -64,26 +63,26 @@ private:
 
     Channels& m_channels;
 
-    static constexpr uint8_t kMaxFunctions = 10;
+    static constexpr uint8_t MaxFunctions = 10;
     struct FuncEntry {
         const char* name;
         RpcHandler handler;
     };
-    FuncEntry m_registry[kMaxFunctions];
+    FuncEntry m_registry[MaxFunctions];
     uint8_t m_regCount = 0;
 
     // Единственный слот исходящего запроса, ожидающего ответа
     SemaphoreHandle_t m_waitSem;
     bool m_waitBusy = false;
-    uint8_t m_waitSeq = 0;
-    uint8_t* m_waitBuf = nullptr;
+    uint8_t m_waitSeq = 0; // Кол-во/номер N
+    uint8_t* m_waitBuf = nullptr; // Ожидаемые данные
     uint16_t m_waitSize = 0;
     uint16_t m_waitGot = 0;
     CallStatus m_waitStatus = CallStatus::Error;
 
     uint8_t m_seq = 0;
-    static constexpr uint16_t kMaxMsg = 256;
-    uint8_t m_txBuf[kMaxMsg];
-    uint8_t m_rxBuf[kMaxMsg];
-    uint8_t m_respBuf[kMaxMsg];
+    static constexpr uint16_t MaxMsg = 256;
+    uint8_t m_txBuf[MaxMsg];
+    uint8_t m_rxBuf[MaxMsg];
+    uint8_t m_respBuf[MaxMsg];
 };

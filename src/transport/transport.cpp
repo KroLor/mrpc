@@ -11,12 +11,12 @@ Transport::Transport(Channels& channels) :
     m_waitGot(0), 
     m_waitStatus(CallStatus::Error), 
     m_seq(0) {
-    // Создаем бинарный семафор для ожидания ответа
+    // Бинарный семафор для ожидания ответа
     m_waitSem = xSemaphoreCreateBinary();
 }
 
 bool Transport::regFunc(const char* name, RpcHandler handler) {
-    if (!name || !handler || m_regCount >= kMaxFunctions) {
+    if (!name || !handler || m_regCount >= MaxFunctions) {
         return false;
     }
     m_registry[m_regCount].name = name;
@@ -38,7 +38,7 @@ CallStatus Transport::call(const char* name,
 
     // Занимаем слот
     m_waitBusy = true;
-    m_waitSeq = ++m_seq;
+    m_waitSeq = ++m_seq; // Последовательное увеличение N
     m_waitBuf = out;
     m_waitSize = *outLen;
     m_waitGot = 0;
@@ -52,7 +52,7 @@ CallStatus Transport::call(const char* name,
 
     // Блокируем задачу RTOS до получения ответа или таймаута
     if (xSemaphoreTake(m_waitSem, pdMS_TO_TICKS(timeoutMs)) == pdTRUE) {
-        *outLen = m_waitGot;
+        *outLen = m_waitGot; // Фактическая длина ответа
     } else {
         // Таймаут
         *outLen = 0;
@@ -68,7 +68,7 @@ bool Transport::dispatchOnce(uint32_t timeoutMs) {
 
     // Пытаемся получить целый пакет от канального уровня
     // Если таймаут истек или пакет битый, poll вернет false
-    if (!m_channels.poll(m_rxBuf, kMaxMsg, &rxLen, timeoutMs)) {
+    if (!m_channels.poll(m_rxBuf, MaxMsg, &rxLen, timeoutMs)) {
         return false; 
     }
 
@@ -106,7 +106,7 @@ bool Transport::sendMsg(MsgType type, uint8_t seq, const char* name, const uint8
     uint16_t nameLen = name ? strlen(name) : 0;
     uint16_t totalLen = 1 + 1 + nameLen + 1 + payloadLen; // type + seq + name + '\0' + payload
 
-    if (totalLen > kMaxMsg) return false;
+    if (totalLen > MaxMsg) return false;
 
     uint16_t pos = 0;
     m_txBuf[pos++] = static_cast<uint8_t>(type);
@@ -158,20 +158,20 @@ void Transport::handleRequest(MsgType type, uint8_t seq, const char* name, const
     }
     // Если не нашли
     if (!handler) {
-        sendMsg(MsgType::Error, seq, "", nullptr, 0);
+        sendMsg(MsgType::Error, seq, "Not find func!", nullptr, 0);
         return;
     }
 
     // Вызываем функцию. Используем m_txBuf как временный буфер для ответа
-    uint16_t respLen = kMaxMsg;
-    bool success = handler(args, argsLen, m_respBuf, &respLen);
+    uint16_t respLen = MaxMsg;
+    bool success = handler(args, argsLen, m_respBuf, &respLen); // Можно возвращать только bool
 
     // Отправляем результат
     if (type == MsgType::Request) {
         if (success) {
-            sendMsg(MsgType::Response, seq, "", m_respBuf, respLen);
+            sendMsg(MsgType::Response, seq, "Response: ", m_respBuf, respLen);
         } else {
-            sendMsg(MsgType::Error, seq, "", nullptr, 0);
+            sendMsg(MsgType::Error, seq, "Error func!", nullptr, 0);
         }
     }
 }
@@ -180,7 +180,7 @@ void Transport::handleResponse(MsgType type, uint8_t seq, const uint8_t* payload
     if (m_waitBusy && seq == m_waitSeq) {
         if (type == MsgType::Response) {
             // Копируем данные
-            uint16_t copyLen = (payloadLen < m_waitSize) ? payloadLen : m_waitSize;
+            uint16_t copyLen = (payloadLen < m_waitSize) ? payloadLen : m_waitSize; // Данных может быть меньше
             if (copyLen > 0 && m_waitBuf) {
                 memcpy(m_waitBuf, payload, copyLen);
             }

@@ -18,7 +18,7 @@ uint8_t Channels::updateCrc8(uint8_t crc, uint8_t byte) {
     crc ^= byte;
     for (int i = 0; i < 8; i++) {
         if (crc & 0x80) {
-            crc = (crc << 1) ^ 0x07;
+            crc = (crc << 1) ^ 0x16; // Полином 0x16
         } else {
             crc <<= 1;
         }
@@ -36,17 +36,17 @@ uint8_t Channels::calcCrc8(const uint8_t* data, uint16_t len) {
 bool Channels::send(const uint8_t* payload, uint16_t len) {
     if (len > kMaxPayload || !payload) return false;
 
-    // Максимальный размер кадра: 0xFA(1) + len(2) + crc(1) + 0xFB(1) + payload + crc(1) + 0xFE(1)
+    // Максимальный размер кадра: 0xFA(1 байт) + len(2) + crc(1) + 0xFB(1) + payload + crc(1) + 0xFE(1)
     uint8_t frame[5 + kMaxPayload + 2];
     uint16_t pos = 0;
 
     // Заголовок
     frame[pos++] = 0xFA;
-    frame[pos++] = len & 0xFF; // l_l
-    frame[pos++] = (len >> 8) & 0xFF; // l_h
+    frame[pos++] = len & 0xFF; // l_l (незначащие нули отбрасываются (uint8_t))
+    frame[pos++] = (len >> 8) & 0xFF; // l_h (старший байт в первом/левом байте длины)
 
     // CRC заголовка
-    uint8_t hdrCrc = calcCrc8(frame, 3);
+    uint8_t hdrCrc = calcCrc8(frame, pos);
     frame[pos++] = hdrCrc;
 
     // Маркер начала данных
@@ -70,7 +70,7 @@ bool Channels::poll(uint8_t* out, uint16_t outSize, uint16_t* outLen, uint32_t t
     uint8_t byte;
     
     // Пытаемся прочитать 1 байт.
-    // Если байт не пришел за timeoutMs, возвращаем false (пакет не готов)
+    // Если байт не пришел за timeoutMs, возвращаем false (пакета нет)
     uint16_t read = m_phys.recv(&byte, 1, timeoutMs);
     if (read == 0) return false;
 
