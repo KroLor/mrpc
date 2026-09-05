@@ -213,40 +213,24 @@ int main(int argc, char* argv[]) {
 
     std::cout << "[Main] Starting as " << (isServer ? "SERVER" : "CLIENT") << std::endl;
 
-    // Создаем физический уровень ForWin
     PhysicsForWin phys("mrpc_pipe", isServer);
-    
-    // Создаем приложение [1]
+
     App app(phys);
 
-    // Запускаем [2]
     if (!app.start()) {
         std::cerr << "[Main] Failed to start App." << std::endl;
         return 2;
     }
 
-    // Настраиваем роль
     if (isServer) {
-        // Регистрируем функции, которые будут доступны клиенту, задача приема остается [3.1]
-        // app.regFunc("echo", rpcEcho);
-        // app.regFunc("sum", rpcSum);
-        // std::cout << "[Server] Registered 'echo' and 'add'. Waiting for requests..." << std::endl;
-
-
-        // [4.1]
         app.regFunc("echo", rpcEcho);
+        app.regFunc("sum", rpcSum);
     } else {
-        // Запускаем задачу, которая будет слать запросы [3.2]
-        // 8192 / sizeof(StackType_t) - расчет стека для Win32, где StackType_t для Win32 = 4 байта
-        // xTaskCreate(clientTask, "ClientTask", 8192 / sizeof(StackType_t), &app, 1, NULL); // Приоритет 1, так как приём важнее отправки
-
-
-        // [4.2]
-        xTaskCreate(clientTaskStream, "ClientTaskStream", 8192 / sizeof(StackType_t), &app, 1, NULL);
+        app.startClientStreamTask(clientTaskStream);
+        // app.startClientTask(clientTask);
     }
 
-    // Запускаем планировщик RTOS [4]
-    std::cout << "[Main] Starting FreeRTOS Scheduler..." << std::endl;
+    std::cout << "[Main] Starting FreeRTOS scheduler..." << std::endl;
     vTaskStartScheduler();
 
     return 0;

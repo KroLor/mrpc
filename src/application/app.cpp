@@ -11,7 +11,7 @@ App::App(Physics& phys) :
     m_physics(phys), 
     m_channels(phys), 
     m_transport(m_channels), 
-    m_rxTaskHandle(nullptr) {}
+    m_rxTaskHndl(nullptr) {}
 
 bool App::start() {
     // Инициализируем физический уровень (UART или Named Pipe)
@@ -30,7 +30,7 @@ bool App::start() {
         stackSizeWords, // Глубина стека (размер)
         this, // Параметр (указатель на экземпляр App)
         2, // Приоритет
-        &m_rxTaskHandle // Дескриптор задачи для удаления
+        &m_rxTaskHndl // Дескриптор задачи для удаления
     );
 
     if (result != pdPASS) {
@@ -43,13 +43,18 @@ bool App::start() {
 }
 
 void App::stop() {
-    // Безопасное удаление задачи
-    if (m_rxTaskHandle != nullptr) {
-        vTaskDelete(m_rxTaskHandle);
-        m_rxTaskHandle = nullptr;
+    if (m_rxTaskHndl != nullptr) {
+        vTaskDelete(m_rxTaskHndl);
+        m_rxTaskHndl = nullptr;
     }
-
-    // Деинициализация физического уровня
+    if (m_clientTaskHndl != nullptr) {
+        vTaskDelete(m_clientTaskHndl);
+        m_clientTaskHndl = nullptr;
+    }
+    if (m_clientStreamTaskHndl != nullptr) {
+        vTaskDelete(m_clientStreamTaskHndl);
+        m_clientStreamTaskHndl = nullptr;
+    }
     m_physics.deinit();
 }
 
@@ -96,4 +101,40 @@ void App::rxLoop() {
             vTaskDelay(pdMS_TO_TICKS(100));
         }
     }
+}
+
+bool App::startClientTask(ClientTaskFunc taskFunc, const char* name, uint32_t stackBytes, UBaseType_t priority) {
+    return createTask(taskFunc, name, stackBytes, priority, m_clientTaskHndl);
+}
+
+bool App::startClientStreamTask(ClientTaskFunc taskFunc, const char* name, uint32_t stackBytes, UBaseType_t priority) {
+    return createTask(taskFunc, name, stackBytes, priority, m_clientStreamTaskHndl);
+}
+
+bool App::createTask(ClientTaskFunc taskFunc, const char* name,
+                     uint32_t stackBytes, UBaseType_t priority,
+                     TaskHandle_t& handle) {
+    if (!taskFunc) {
+        std::cerr << "[App] Task function is null." << std::endl;
+        return false;
+    }
+    if (handle != nullptr) {
+        return false; // Задача уже создана
+    }
+
+    const uint32_t stackSizeWords = stackBytes / sizeof(StackType_t);
+    BaseType_t result = xTaskCreate(
+        taskFunc,
+        name,
+        stackSizeWords,
+        this,
+        priority,
+        &handle
+    );
+    if (result != pdPASS) {
+        std::cerr << "[App] Failed to create task: " << name << std::endl;
+        handle = nullptr;
+        return false;
+    }
+    return true;
 }

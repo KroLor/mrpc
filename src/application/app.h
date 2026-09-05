@@ -7,6 +7,8 @@
 #include "channels.h"
 #include "physics.h"
 
+using ClientTaskFunc = void (*)(void* param);
+
 class App {
 public:
     App(Physics& phys);
@@ -60,6 +62,15 @@ public:
      */
     bool isConnected() const;
 
+    bool startClientTask(ClientTaskFunc taskFunc,
+                         const char* name = "ClientTask",
+                         uint32_t stackBytes = 8192,
+                         UBaseType_t priority = 1);
+    bool startClientStreamTask(ClientTaskFunc taskFunc,
+                               const char* name = "ClientStreamTask",
+                               uint32_t stackBytes = 8192,
+                               UBaseType_t priority = 1);
+
 private:
     static void rxTask(void* param);
     
@@ -70,5 +81,12 @@ private:
     Channels m_channels;
     Transport m_transport;
     
-    TaskHandle_t m_rxTaskHandle;
+    // Задачи
+    TaskHandle_t m_rxTaskHndl = nullptr;
+    TaskHandle_t m_clientTaskHndl = nullptr;
+    TaskHandle_t m_clientStreamTaskHndl = nullptr;
+
+    bool createTask(ClientTaskFunc taskFunc, const char* name,
+                    uint32_t stackBytes, UBaseType_t priority,
+                    TaskHandle_t& handle);
 };

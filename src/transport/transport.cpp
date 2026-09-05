@@ -132,13 +132,11 @@ bool Transport::dispatchOnce(uint32_t timeoutMs) {
             handleResponse(type, seq, args, argsLen);
         }
     }
-    else if (type == MsgType::Stream) {
-        if (m_streamBusy && seq == m_streamSeq) {
-            handleStream(type, seq, args, argsLen);
-        }
-        else {
-            handleRequest(type, seq, name, args, argsLen); 
-        }
+    else if (type == MsgType::Stream && m_streamBusy && seq == m_streamSeq) {
+        handleStream(type, seq, args, argsLen);
+    }
+    else {
+        handleRequest(type, seq, name, args, argsLen);
     }
 
     return true;
@@ -207,7 +205,7 @@ bool Transport::parseMsg(const uint8_t* pkt, uint16_t len,
 void Transport::handleRequest(MsgType type, uint8_t seq, const char* name, const uint8_t* args, uint16_t argsLen) {
     // Ищем функцию в реестре
     RpcHandler handler = nullptr;
-    for (uint8_t i = 0; i < m_regCount; ++i) {
+    for (uint8_t i = 0; i < m_regCount; i++) {
         if (strcmp(m_registry[i].name, name) == 0) {
             handler = m_registry[i].handler;
             break;
@@ -215,14 +213,14 @@ void Transport::handleRequest(MsgType type, uint8_t seq, const char* name, const
     }
     // Если не нашли
     if (!handler) {
-        sendMsg(MsgType::Error, seq, "Not find func!", nullptr, 0);
+        sendMsg(MsgType::Error, seq, "Not find func!", nullptr, 0); // Сообщения Error не выводятся на сервере
         return;
     }
 
     // Вызываем функцию. Используем m_txBuf как временный буфер для ответа
     uint16_t respLen = MaxMsg;
-    bool success = handler(args, argsLen, m_respBuf, &respLen); // Можно возвращать только bool
-
+    bool success = handler(args, argsLen, m_respBuf, &respLen); // Можно возвращать только bool в call режиме (при обычном Request)
+    
     // Отправляем результат
     if (type == MsgType::Request) {
         if (success) {
@@ -254,7 +252,7 @@ void Transport::handleResponse(MsgType type, uint8_t seq, const uint8_t* payload
             }
             m_waitGot = copyLen;
             m_waitStatus = CallStatus::Success;
-        } else if (type == MsgType::Error) {
+        } else if (type == MsgType::Error) { // Без текста ошибки
             m_waitStatus = CallStatus::RemoteError;
             m_waitGot = 0;
         }
