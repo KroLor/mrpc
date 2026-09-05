@@ -103,11 +103,11 @@ void App::rxLoop() {
     }
 }
 
-bool App::startClientTask(ClientTaskFunc taskFunc, const char* name, uint32_t stackBytes, UBaseType_t priority) {
+bool App::createClientTask(ClientTaskFunc taskFunc, const char* name, uint32_t stackBytes, UBaseType_t priority) {
     return createTask(taskFunc, name, stackBytes, priority, m_clientTaskHndl);
 }
 
-bool App::startClientStreamTask(ClientTaskFunc taskFunc, const char* name, uint32_t stackBytes, UBaseType_t priority) {
+bool App::createClientStreamTask(ClientTaskFunc taskFunc, const char* name, uint32_t stackBytes, UBaseType_t priority) {
     return createTask(taskFunc, name, stackBytes, priority, m_clientStreamTaskHndl);
 }
 

@@ -62,11 +62,11 @@ public:
      */
     bool isConnected() const;
 
-    bool startClientTask(ClientTaskFunc taskFunc,
+    bool createClientTask(ClientTaskFunc taskFunc,
                          const char* name = "ClientTask",
                          uint32_t stackBytes = 8192,
                          UBaseType_t priority = 1);
-    bool startClientStreamTask(ClientTaskFunc taskFunc,
+    bool createClientStreamTask(ClientTaskFunc taskFunc,
                                const char* name = "ClientStreamTask",
                                uint32_t stackBytes = 8192,
                                UBaseType_t priority = 1);
