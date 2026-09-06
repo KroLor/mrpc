@@ -231,7 +231,7 @@ void Transport::handleRequest(MsgType type, uint8_t seq, const char* name, const
     }
     else if (type == MsgType::Stream) {
         if (success) {
-            for (uint8_t i = 0; i < 5; ++i) {
+            for (uint8_t i = 0; i < 5; i++) {
                 sendMsg(MsgType::Stream, seq, "", m_respBuf, respLen);
                 vTaskDelay(pdMS_TO_TICKS(200));
             }
