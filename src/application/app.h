@@ -24,10 +24,10 @@ public:
      * @brief Инициализация задачи приема.
      * @return true при успешном создании задачи.
      */
-    bool start();
+    bool start(UBaseType_t priority = 2);
 
     /**
-     * @brief Остановка узла.
+     * @brief Остановка приложения.
      */
     void stop();
 

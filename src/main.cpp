@@ -81,7 +81,7 @@ uint16_t PhysicsForWin::recv(uint8_t* data, uint16_t maxSize, uint32_t timeoutMs
 
     if (avail.empty()) return 0;
 
-    // Копируем в пользовательский буфер
+    // Копируем в буфер
     uint16_t copyLen = std::min(static_cast<uint16_t>(avail.size()), maxSize);
     std::memcpy(data, avail.data(), copyLen);
 
@@ -226,11 +226,11 @@ int main(int argc, char* argv[]) {
     }
 
     if (isServer) {
-        app.regFunc("echo", rpcEcho);
+        // app.regFunc("echo", rpcEcho);
         app.regFunc("sum", rpcSum);
     } else {
-        // app.createClientStreamTask(clientTaskStream);
-        app.createClientTask(clientTask);
+        app.createClientStreamTask(clientTaskStream);
+        // app.createClientTask(clientTask);
     }
 
     std::cout << "[Main] Starting FreeRTOS scheduler..." << std::endl;

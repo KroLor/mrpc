@@ -13,7 +13,7 @@ App::App(Physics& phys) :
     m_transport(m_channels), 
     m_rxTaskHndl(nullptr) {}
 
-bool App::start() {
+bool App::start(UBaseType_t priority) {
     // Инициализируем физический уровень (UART или Named Pipe)
     if (!m_physics.init()) {
         std::cerr << "[App] Failed to initialize physical layer." << std::endl;
@@ -29,7 +29,7 @@ bool App::start() {
         "AppRxTask", // Имя для отладчика
         stackSizeWords, // Глубина стека (размер)
         this, // Параметр (указатель на экземпляр App)
-        2, // Приоритет
+        priority, // Приоритет
         &m_rxTaskHndl // Дескриптор задачи для удаления
     );
 
