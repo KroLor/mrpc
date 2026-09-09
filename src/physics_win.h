@@ -1,6 +1,8 @@
 #pragma once
 
 #include "physics.h"
+#include "server.h"
+#include "client.h"
 #include <memory>
 #include <vector>
 #include <string>
