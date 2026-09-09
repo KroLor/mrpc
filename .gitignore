@@ -1,1 +1,1 @@
-Nothing needs to be added to .gitignore since the changes only include source code files (.cpp, .h) which should not be ignored.
+build
