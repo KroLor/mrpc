@@ -70,4 +70,15 @@ private:
     static uint8_t calcCrc8(const uint8_t* data, uint16_t len);
     // Обновление CRC8 новым байтом
     static uint8_t updateCrc8(uint8_t crc, uint8_t byte);
+
+    // Буферизация входящих данных для предотвращения потерь при стриминге
+    static constexpr uint16_t kRxBufferSize = 512; // Размер буфера приема
+    uint8_t m_rxBuffer[kRxBufferSize];
+    uint16_t m_rxHead = 0; // Позиция записи в буфер
+    uint16_t m_rxTail = 0; // Позиция чтения из буфера
+
+    // Заполнение буфера данными из физического уровня
+    void fillRxBuffer(uint32_t timeoutMs);
+    // Получение одного байта из буфера
+    bool readFromBuffer(uint8_t* byte);
 };

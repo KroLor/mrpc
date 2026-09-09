@@ -12,6 +12,8 @@ void Channels::reset() {
     m_payloadPos = 0;
     m_hdrCrc = 0;
     m_pktCrc = 0;
+    m_rxHead = 0;
+    m_rxTail = 0;
 }
 
 // CRC8
@@ -32,6 +34,43 @@ uint8_t Channels::calcCrc8(const uint8_t* data, uint16_t len) {
         crc = updateCrc8(crc, data[i]);
     }
     return crc;
+}
+
+void Channels::fillRxBuffer(uint32_t timeoutMs) {
+    // Читаем максимально возможное количество данных из физического уровня
+    // и помещаем их в кольцевой буфер
+    uint16_t freeSpace = kRxBufferSize - (m_rxHead >= m_rxTail ? m_rxHead - m_rxTail : m_rxTail - m_rxHead);
+
+    // Если буфер почти полон (осталось меньше 128 байт), не читаем
+    if (freeSpace < 128) {
+        return;
+    }
+
+    // Вычисляем позицию для записи с учетом кольцевой структуры
+    uint16_t writePos = m_rxHead % kRxBufferSize;
+    uint16_t contiguousSpace = kRxBufferSize - writePos;
+    uint16_t readLen = (freeSpace < contiguousSpace) ? freeSpace : contiguousSpace;
+
+    if (readLen == 0) {
+        return;
+    }
+
+    // Читаем данные из физического уровня
+    uint16_t received = m_phys.recv(&m_rxBuffer[writePos], readLen);
+
+    if (received > 0) {
+        m_rxHead += received;
+    }
+}
+
+bool Channels::readFromBuffer(uint8_t* byte) {
+    if (m_rxHead == m_rxTail) {
+        return false; // Буфер пуст
+    }
+
+    *byte = m_rxBuffer[m_rxTail % kRxBufferSize];
+    m_rxTail++;
+    return true;
 }
 
 bool Channels::send(const uint8_t* payload, uint16_t len) {
@@ -74,11 +113,19 @@ bool Channels::send(const uint8_t* payload, uint16_t len) {
 
 bool Channels::poll(uint8_t* out, uint16_t outSize, uint16_t* outLen, uint32_t timeoutMs) {
     uint8_t byte;
-    
-    // Пытаемся прочитать 1 байт.
-    // Если байт не пришел за timeoutMs, возвращаем false (пакета нет)
-    uint16_t read = m_phys.recv(&byte, 1);
-    if (read == 0) return false;
+
+    // Сначала пытаемся получить байт из буфера
+    if (!readFromBuffer(&byte)) {
+        // Если буфер пуст, заполняем его данными из физического уровня
+        fillRxBuffer(timeoutMs);
+
+        // Пытаемся снова прочитать из буфера
+        if (!readFromBuffer(&byte)) {
+            return false; // Нет данных
+        }
+    } else {
+        return false;
+    }
 
     switch (m_state) {
         case State::WaitStart:
