@@ -158,7 +158,8 @@ void Transport::linkDown() {
 }
 
 bool Transport::sendMsg(MsgType type, uint8_t seq, const char* name, const uint8_t* payload, uint16_t payloadLen) {
-    uint16_t nameLen = name ? strlen(name) : 0;
+    const char* _name = name ? name : "";
+    uint16_t nameLen = strlen(_name);
     uint16_t totalLen = 1 + 1 + nameLen + 1 + payloadLen; // type + seq + name + '\0' + payload
 
     if (totalLen > MaxMsg) return false;
@@ -167,12 +168,8 @@ bool Transport::sendMsg(MsgType type, uint8_t seq, const char* name, const uint8
     m_txBuf[pos++] = static_cast<uint8_t>(type);
     m_txBuf[pos++] = seq;
     
-    if (name) {
-        strcpy(reinterpret_cast<char*>(&m_txBuf[pos]), name);
-        pos += nameLen + 1; // +1 для терминатора строки
-    } else {
-        m_txBuf[pos++] = '\0';
-    }
+    strcpy(reinterpret_cast<char*>(&m_txBuf[pos]), _name);
+    pos += nameLen + 1; // +1 для терминатора строки
 
     if (payload && payloadLen > 0) {
         memcpy(&m_txBuf[pos], payload, payloadLen);
@@ -185,13 +182,16 @@ bool Transport::sendMsg(MsgType type, uint8_t seq, const char* name, const uint8
 bool Transport::parseMsg(const uint8_t* pkt, uint16_t len,
                          MsgType& type, uint8_t& seq, const char*& name,
                          const uint8_t*& args, uint16_t& argsLen) {
-    if (len < 3) return false; // Минимум type, seq, '\0'
+    if (!pkt || len < 3) return false; // Минимум type, seq, '\0'
 
     type = static_cast<MsgType>(pkt[0]);
     seq = pkt[1];
     name = reinterpret_cast<const char*>(&pkt[2]);
     
-    uint16_t nameLen = strlen(name);
+    // Проверяем, чтобы имя не выходило за пределы пакета
+    uint16_t nameLen = 0;
+    for (uint16_t i = 2; i < len && name[nameLen] != '\0'; ++i, ++nameLen) {}
+
     uint16_t headerSize = 2 + nameLen + 1; // type + seq + name + '\0'
 
     if (headerSize > len) return false; // Нет места под аргументы
@@ -203,10 +203,14 @@ bool Transport::parseMsg(const uint8_t* pkt, uint16_t len,
 }
 
 void Transport::handleRequest(MsgType type, uint8_t seq, const char* name, const uint8_t* args, uint16_t argsLen) {
+    if (!name) {
+        sendMsg(MsgType::Error, seq, "Null name", nullptr, 0);
+        return;
+    }
     // Ищем функцию в реестре
     RpcHandler handler = nullptr;
     for (uint8_t i = 0; i < m_regCount; i++) {
-        if (strcmp(m_registry[i].name, name) == 0) {
+        if (m_registry[i].name && strcmp(m_registry[i].name, name) == 0) {
             handler = m_registry[i].handler;
             break;
         }
@@ -243,29 +247,36 @@ void Transport::handleRequest(MsgType type, uint8_t seq, const char* name, const
 }
 
 void Transport::handleResponse(MsgType type, uint8_t seq, const uint8_t* payload, uint16_t payloadLen) {
-    if (m_waitBusy && seq == m_waitSeq) {
-        if (type == MsgType::Response) {
-            // Копируем данные
-            uint16_t copyLen = (payloadLen < m_waitSize) ? payloadLen : m_waitSize; // Данных может быть меньше
-            if (copyLen > 0 && m_waitBuf) {
-                memcpy(m_waitBuf, payload, copyLen);
-            }
-            m_waitGot = copyLen;
-            m_waitStatus = CallStatus::Success;
-        } else if (type == MsgType::Error) { // Без текста ошибки
-            m_waitStatus = CallStatus::RemoteError;
-            m_waitGot = 0;
-        }
-        
-        // Будим задачу
-        xSemaphoreGive(m_waitSem);
+    if (!m_waitBusy || seq != m_waitSeq) {
+        return;
     }
+
+    if (type == MsgType::Response) {
+        // Копируем данные
+        uint16_t copyLen = (payloadLen < m_waitSize) ? payloadLen : m_waitSize; // Данных может быть меньше
+        if (copyLen > 0 && m_waitBuf && payload) {
+            memcpy(m_waitBuf, payload, copyLen);
+        }
+        m_waitGot = copyLen;
+        m_waitStatus = CallStatus::Success;
+    } else if (type == MsgType::Error) { // Без текста ошибки
+        m_waitStatus = CallStatus::RemoteError;
+        m_waitGot = 0;
+    }
+
+    // Будим задачу
+    xSemaphoreGive(m_waitSem);
 }
 
 void Transport::handleStream(MsgType type, uint8_t seq, const uint8_t* payload, uint16_t payloadLen) {
+    if (!payload) {
+        xSemaphoreGive(m_streamSem);
+        return;
+    }
+    
     if (type == MsgType::Stream) {
         uint16_t copyLen = (payloadLen < MaxMsg) ? payloadLen : MaxMsg;
-        if (copyLen > 0 && payload) {
+        if (copyLen > 0) {
             memcpy(m_streamLastBuf, payload, copyLen);
         }
         m_streamLastLen = copyLen;
