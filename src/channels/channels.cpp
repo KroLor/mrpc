@@ -77,7 +77,7 @@ bool Channels::poll(uint8_t* out, uint16_t outSize, uint16_t* outLen, uint32_t t
     
     // Пытаемся прочитать 1 байт.
     // Если байт не пришел за timeoutMs, возвращаем false (пакета нет)
-    uint16_t read = m_phys.recv(&byte, 1, timeoutMs);
+    uint16_t read = m_phys.recv(&byte, 1);
     if (read == 0) return false;
 
     switch (m_state) {

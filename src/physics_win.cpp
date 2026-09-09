@@ -72,10 +72,8 @@ bool PhysicsForWin::send(const uint8_t* data, uint16_t len)
     return false;
 }
 
-uint16_t PhysicsForWin::recv(uint8_t* data, uint16_t maxSize, uint32_t timeoutMs)
+uint16_t PhysicsForWin::recv(uint8_t* data, uint16_t maxSize)
 {
-    (void)timeoutMs; // Не используется, берем данные из буфера и идем дальше
-
     if (!m_init || !data || maxSize == 0) {
         return 0;
     }
@@ -92,7 +90,7 @@ uint16_t PhysicsForWin::recv(uint8_t* data, uint16_t maxSize, uint32_t timeoutMs
     // Добавляем остатки от предыдущего чтения
     avail.insert(avail.begin(), m_leftover.begin(), m_leftover.end());
     m_leftover.clear();
-
+    
     if (avail.empty()) {
         return 0;
     }

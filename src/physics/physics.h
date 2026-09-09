@@ -35,10 +35,9 @@ public:
      * @brief Прием сырых байтов из среды передачи.
      * @param data Буфер для принятых данных.
      * @param maxSize Максимальный размер буфера.
-     * @param timeoutMs Таймаут ожидания в миллисекундах.
      * @return Количество реально принятых байт.
      */
-    virtual uint16_t recv(uint8_t* data, uint16_t maxSize, uint32_t timeoutMs) = 0;
+    virtual uint16_t recv(uint8_t* data, uint16_t maxSize) = 0;
 
     /**
      * @brief Обновление состояния соединения и обработка операций чтения/записи.

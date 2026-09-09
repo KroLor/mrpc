@@ -50,7 +50,7 @@ public:
      * @param maxSize Максимальный размер буфера.
      * @return Количество реально принятых байт.
      */
-    uint16_t recv(uint8_t* data, uint16_t maxSize, uint32_t timeoutMs) override;
+    uint16_t recv(uint8_t* data, uint16_t maxSize) override;
 
     /**
      * @brief Обновление состояния соединения и обработка операций чтения/записи.
