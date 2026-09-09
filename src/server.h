@@ -2,6 +2,9 @@
 
 #include <windows.h>
 #include <vector>
+#include <cstdint>
+
+using byte = uint8_t;
 
 class PipeServer {
 public:

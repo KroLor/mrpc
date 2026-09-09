@@ -6,6 +6,7 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <cstdint>
 
 class PhysicsForWin : public Physics {
 public:
