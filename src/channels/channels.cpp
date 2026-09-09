@@ -68,7 +68,7 @@ bool Channels::send(const uint8_t* payload, uint16_t len) {
     frame[pos++] = 0xFE;
 
     bool result = m_phys.send(frame, pos);
-    std::free(frame);
+    std::free(frame); // Освобождаем
     return result;
 }
 
