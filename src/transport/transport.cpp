@@ -79,6 +79,7 @@ CallStatus Transport::stream(const char* name, const uint8_t* args, uint16_t arg
     m_streamStatus = CallStatus::Timeout;
     m_streamLastLen = 0;
     m_streamEnded = false;
+    m_streamChunkCallback = Chunk;
     
     // Отправляем stream-запрос (0x0C)
     if (!sendMsg(MsgType::Stream, m_streamSeq, name, args, argsLen)) {
@@ -95,12 +96,7 @@ CallStatus Transport::stream(const char* name, const uint8_t* args, uint16_t arg
         if (m_streamEnded) {
             break;
         }
-
-        // Обрабатываем данные стрима
-        if (Chunk && m_streamLastLen > 0) {
-            Chunk(m_streamLastBuf, m_streamLastLen);
-            m_streamLastLen = 0;
-        }
+        // Чанк уже обработан в handleStream(), просто продолжаем цикл
     }
     
     m_streamBusy = false;
@@ -277,19 +273,24 @@ void Transport::handleResponse(MsgType type, uint8_t seq, const uint8_t* payload
 }
 
 void Transport::handleStream(MsgType type, uint8_t seq, const uint8_t* payload, uint16_t payloadLen) {
-    if (!payload) {
-        xSemaphoreGive(m_streamSem);
-        return;
-    }
-    
     if (type == MsgType::Stream) {
+        if (!payload || payloadLen == 0) {
+            xSemaphoreGive(m_streamSem);
+            return;
+        }
+        
         uint16_t copyLen = (payloadLen < MaxMsg) ? payloadLen : MaxMsg;
         if (copyLen > 0) {
             memcpy(m_streamLastBuf, payload, copyLen);
         }
         m_streamLastLen = copyLen;
         m_streamDataReady = true;
-        m_streamStatus = CallStatus::Success; // Cтрим продолжается
+        m_streamStatus = CallStatus::Success; // Стрим продолжается
+        
+        // Вызываем колбэк сразу в контексте dispatch
+        if (m_streamChunkCallback) {
+            m_streamChunkCallback(m_streamLastBuf, m_streamLastLen);
+        }
     }
 
     xSemaphoreGive(m_streamSem);
