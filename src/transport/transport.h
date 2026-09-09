@@ -155,4 +155,5 @@ private:
     CallStatus m_streamStatus = CallStatus::Error;
     bool m_streamDataReady = false;
     bool m_streamEnded = false;
+    StreamCallback m_streamChunkCallback = nullptr;
 };
