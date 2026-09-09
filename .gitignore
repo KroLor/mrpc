@@ -1,1 +1,10 @@
-(src/channels/channels.cpp)
+```
+# Build artifacts
+build/
+CMakeCache.txt
+CMakeFiles/
+
+# Compiled files
+*.bin
+*.out
+```
