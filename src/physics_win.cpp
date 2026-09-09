@@ -74,6 +74,8 @@ bool PhysicsForWin::send(const uint8_t* data, uint16_t len)
 
 uint16_t PhysicsForWin::recv(uint8_t* data, uint16_t maxSize, uint32_t timeoutMs)
 {
+    (void)timeoutMs; // Не используется, берем данные из буфера и идем дальше
+
     if (!m_init || !data || maxSize == 0) {
         return 0;
     }
