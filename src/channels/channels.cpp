@@ -12,8 +12,8 @@ void Channels::reset() {
     m_payloadPos = 0;
     m_hdrCrc = 0;
     m_pktCrc = 0;
-    m_rxHead = 0;
-    m_rxTail = 0;
+    m_streamHead = 0;
+    m_streamTail = 0;
 }
 
 // CRC8
@@ -36,40 +36,36 @@ uint8_t Channels::calcCrc8(const uint8_t* data, uint16_t len) {
     return crc;
 }
 
-void Channels::fillRxBuffer(uint32_t timeoutMs) {
-    // Читаем максимально возможное количество данных из физического уровня
-    // и помещаем их в кольцевой буфер
-    uint16_t freeSpace = kRxBufferSize - (m_rxHead >= m_rxTail ? m_rxHead - m_rxTail : m_rxTail - m_rxHead);
+void Channels::pumpStreamBuf() {
+    uint16_t used = m_streamHead - m_streamTail;
+    uint16_t freeSpace = kStreamBufSize - used;
 
-    // Если буфер почти полон (осталось меньше 128 байт), не читаем
     if (freeSpace < 128) {
         return;
     }
 
-    // Вычисляем позицию для записи с учетом кольцевой структуры
-    uint16_t writePos = m_rxHead % kRxBufferSize;
-    uint16_t contiguousSpace = kRxBufferSize - writePos;
+    uint16_t writePos = m_streamHead & (kStreamBufSize - 1);
+    uint16_t contiguousSpace = kStreamBufSize - writePos;
     uint16_t readLen = (freeSpace < contiguousSpace) ? freeSpace : contiguousSpace;
 
     if (readLen == 0) {
         return;
     }
 
-    // Читаем данные из физического уровня
-    uint16_t received = m_phys.recv(&m_rxBuffer[writePos], readLen);
+    uint16_t received = m_phys.recv(&m_streamBuf[writePos], readLen);
 
     if (received > 0) {
-        m_rxHead += received;
+        m_streamHead += received;
     }
 }
 
-bool Channels::readFromBuffer(uint8_t* byte) {
-    if (m_rxHead == m_rxTail) {
-        return false; // Буфер пуст
+bool Channels::readStreamByte(uint8_t* byte) {
+    if (m_streamHead == m_streamTail) {
+        return false;
     }
 
-    *byte = m_rxBuffer[m_rxTail % kRxBufferSize];
-    m_rxTail++;
+    *byte = m_streamBuf[m_streamTail & (kStreamBufSize - 1)]; // Кольцевой буфер
+    m_streamTail++;
     return true;
 }
 
@@ -115,16 +111,12 @@ bool Channels::poll(uint8_t* out, uint16_t outSize, uint16_t* outLen, uint32_t t
     uint8_t byte;
 
     // Сначала пытаемся получить байт из буфера
-    if (!readFromBuffer(&byte)) {
-        // Если буфер пуст, заполняем его данными из физического уровня
-        fillRxBuffer(timeoutMs);
+    if (!readStreamByte(&byte)) {
+        pumpStreamBuf();
 
-        // Пытаемся снова прочитать из буфера
-        if (!readFromBuffer(&byte)) {
-            return false; // Нет данных
+        if (!readStreamByte(&byte)) {
+            return false;
         }
-    } else {
-        return false;
     }
 
     switch (m_state) {
