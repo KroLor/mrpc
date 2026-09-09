@@ -1,1 +1,38 @@
-build
+```
+# Build artifacts
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+Makefile
+*.cmake
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+*.dll
+
+# Dependencies
+vendor/
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+```
