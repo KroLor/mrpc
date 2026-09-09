@@ -168,7 +168,7 @@ bool Transport::sendMsg(MsgType type, uint8_t seq, const char* name, const uint8
     m_txBuf[pos++] = seq;
     
     if (name) {
-        strcpy((char*)&m_txBuf[pos], name);
+        strcpy(reinterpret_cast<char*>(&m_txBuf[pos]), name);
         pos += nameLen + 1; // +1 для терминатора строки
     } else {
         m_txBuf[pos++] = '\0';
