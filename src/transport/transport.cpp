@@ -79,7 +79,7 @@ CallStatus Transport::stream(const char* name, const uint8_t* args, uint16_t arg
     m_streamStatus = CallStatus::Timeout;
     m_streamLastLen = 0;
     m_streamEnded = false;
-    m_streamChunkCallback = Chunk;
+    m_streamChunkCallback = Chunk; // Берем функцию для стрим обработки
     
     // Отправляем stream-запрос (0x0C)
     if (!sendMsg(MsgType::Stream, m_streamSeq, name, args, argsLen)) {
@@ -96,7 +96,6 @@ CallStatus Transport::stream(const char* name, const uint8_t* args, uint16_t arg
         if (m_streamEnded) {
             break;
         }
-        // Чанк уже обработан в handleStream(), просто продолжаем цикл
     }
     
     m_streamBusy = false;
@@ -287,7 +286,7 @@ void Transport::handleStream(MsgType type, uint8_t seq, const uint8_t* payload, 
         m_streamDataReady = true;
         m_streamStatus = CallStatus::Success; // Стрим продолжается
         
-        // Вызываем колбэк сразу в контексте dispatch
+        // Вызываем колбэк сразу!!
         if (m_streamChunkCallback) {
             m_streamChunkCallback(m_streamLastBuf, m_streamLastLen);
         }
