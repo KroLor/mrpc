@@ -4,11 +4,23 @@
 
 #include "physics.h"
 
+/**
+ * @brief Класс канального уровня протокола MRPC.
+ * 
+ * Отвечает за формирование и парсинг пакетов (кадров) с использованием
+ * контрольных сумм CRC8. Работает поверх физического уровня, передавая
+ * и принимая поток байт.
+ */
 class Channels {
 public:
+    /**
+     * @brief Конструктор с привязкой к физическому уровню.
+     * @param physics Ссылка на объект физического уровня.
+     */
     Channels(Physics& physics);
 
     /**
+     * @brief Отправка данных транспортного уровня.
      * @param payload Указатель на данные транспортного уровня.
      * @param len Длина данных.
      * @return true при успешной отправке.
@@ -16,6 +28,7 @@ public:
     bool send(const uint8_t* payload, uint16_t len);
 
     /**
+     * @brief Попытка приема и проверки целого пакета.
      * @param out Буфер для принятой полезной нагрузки.
      * @param outSize Размер буфера out.
      * @param outLen Фактически принятая длина payload.
@@ -24,6 +37,9 @@ public:
      */
     bool poll(uint8_t* out, uint16_t outSize, uint16_t* outLen, uint32_t timeoutMs);
 
+    /**
+     * @brief Сброс состояния автомата в начальное.
+     */
     void reset();
 
 private:
