@@ -185,29 +185,3 @@ void PipeClient::disconnect()
     txBuffer.clear();
     receivedData.clear();
 }
-
-bool PipeClient::waitForData(uint32_t timeoutMs)
-{
-    if (state != CONNECTED || ovRead.hEvent == nullptr) {
-        return false;
-    }
-
-    // Ожидаем событие с таймаутом
-    if (WaitForSingleObject(ovRead.hEvent, timeoutMs) != WAIT_OBJECT_0) {
-        return false;
-    }
-
-    DWORD bytesTrans = 0;
-    if (GetOverlappedResult(hPipe, &ovRead, &bytesTrans, FALSE)) {
-        if (bytesTrans > 0) {
-            receivedData.insert(receivedData.end(), buffer, buffer + bytesTrans);
-        }
-        // Перезапускаем чтение
-        ResetEvent(ovRead.hEvent);
-        ReadFile(hPipe, buffer, sizeof(buffer), nullptr, &ovRead);
-        return true;
-    }
-
-    disconnect();
-    return false;
-}

@@ -78,22 +78,12 @@ uint16_t PhysicsForWin::recv(uint8_t* data, uint16_t maxSize, uint32_t timeoutMs
         return 0;
     }
 
-    // Ожидаем данные, если буфер остатков пуст
-    if (m_leftover.empty()) {
-        if (m_isServer && m_server) {
-            m_server->waitForData(timeoutMs);
-        }
-        else if (!m_isServer && m_client) {
-            m_client->waitForData(timeoutMs);
-        }
-    }
-
     // Получаем доступные данные
     std::vector<uint8_t> avail;
     if (m_isServer && m_server) {
         avail = m_server->getReceivedData();
     }
-    else {
+    else if (!m_isServer && m_client) {
         avail = m_client->getReceivedData();
     }
 

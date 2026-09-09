@@ -52,13 +52,6 @@ public:
     bool isConnected() const { return state == WAITING_READ; }
 
     /**
-     * @brief Ожидание появления данных с таймаутом.
-     * @param timeoutMs Таймаут ожидания в миллисекундах.
-     * @return true если данные получены за время таймаута.
-     */
-    bool waitForData(uint32_t timeoutMs);
-
-    /**
      * @brief Проверка наличия принятых данных в буфере.
      * @return true если есть данные для чтения.
      */

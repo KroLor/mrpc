@@ -181,37 +181,3 @@ void PipeServer::close()
         ovWrite.hEvent = nullptr;
     }
 }
-
-bool PipeServer::waitForData(uint32_t timeoutMs)
-{
-    if (state != WAITING_READ || ov.hEvent == nullptr) {
-        return false;
-    }
-
-    if (WaitForSingleObject(ov.hEvent, timeoutMs) != WAIT_OBJECT_0) {
-        return false;
-    }
-
-    DWORD bytesTransferred = 0;
-    if (GetOverlappedResult(hPipe, &ov, &bytesTransferred, FALSE)) {
-        if (bytesTransferred > 0) {
-            receivedData.insert(receivedData.end(), buffer, buffer + bytesTransferred);
-        }
-        ResetEvent(ov.hEvent);
-        ReadFile(hPipe, buffer, sizeof(buffer), nullptr, &ov);
-        return true;
-    }
-
-    // Обрыв связи
-    std::cout << "[Server] Client disconnected." << std::endl;
-    DisconnectNamedPipe(hPipe);
-    receivedData.clear();
-    txBuffer.clear();
-    isWriting = false;
-    ResetEvent(ov.hEvent);
-    ResetEvent(ovWrite.hEvent);
-    ConnectNamedPipe(hPipe, &ov);
-    state = WAITING_CONNECT;
-
-    return false;
-}
