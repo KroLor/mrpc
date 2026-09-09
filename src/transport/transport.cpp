@@ -13,8 +13,8 @@ Transport::Transport(Channels& channels) :
     m_seq(0) {
     // Бинарный семафор для ожидания ответа
     m_waitSem = xSemaphoreCreateBinary();
-    // Счетный семафор для потоковой передачи (максимум 10 сообщений в буфере)
-    m_streamSem = xSemaphoreCreateCounting(10, 0);
+    // Счетный семафор для потоковой передачи (максимум 50 сообщений в буфере)
+    m_streamSem = xSemaphoreCreateCounting(50, 0);
 }
 
 bool Transport::regFunc(const char* name, RpcHandler handler) {
@@ -101,7 +101,6 @@ CallStatus Transport::stream(const char* name, const uint8_t* args, uint16_t arg
             Chunk(m_streamLastBuf, m_streamLastLen);
             m_streamLastLen = 0;
         }
-        break;
     }
     
     m_streamBusy = false;
@@ -246,7 +245,7 @@ void Transport::handleRequest(MsgType type, uint8_t seq, const char* name, const
         if (success) {
             for (uint8_t i = 0; i < 5; i++) {
                 sendMsg(MsgType::Stream, seq, "", m_respBuf, respLen);
-                vTaskDelay(pdMS_TO_TICKS(100));
+                vTaskDelay(pdMS_TO_TICKS(500));
             }
             sendMsg(MsgType::Response, seq, "", nullptr, 0); // Конец стрима
         } else {
