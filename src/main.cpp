@@ -89,7 +89,7 @@ void clientTaskStream(void* param) {
     const char* msg = "Hello World! _Stream";
 
     for (;;) {
-        // Таймаут 3000 мс для каждого чанка (сервер отправляет с задержкой 500 мс)
+        // Таймаут 3000 мс для каждого чанка
         CallStatus status = app.stream("echo", (const uint8_t*)msg, strlen(msg), StreamChunk, 3000);
 
         std::cout << "[Client] Stream finished, status: " << static_cast<int>(status) << std::endl;
