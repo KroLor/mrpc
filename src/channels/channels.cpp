@@ -1,5 +1,6 @@
 #include "channels.h"
 #include <cstring>
+#include <cstdlib>
 
 Channels::Channels(Physics& physics) : m_phys(physics) {
     reset();
@@ -37,7 +38,10 @@ bool Channels::send(const uint8_t* payload, uint16_t len) {
     if (len > kMaxPayload || !payload) return false;
 
     // Максимальный размер кадра: 0xFA(1 байт) + len(2) + crc(1) + 0xFB(1) + payload + crc(1) + 0xFE(1)
-    uint8_t frame[5 + kMaxPayload + 2];
+    // Используем динамическое выделение памяти под конкретную длину текущего payload
+    uint8_t* frame = static_cast<uint8_t*>(std::malloc(5 + len + 2));
+    if (!frame) return false;
+    
     uint16_t pos = 0;
 
     // Заголовок
@@ -63,7 +67,9 @@ bool Channels::send(const uint8_t* payload, uint16_t len) {
     // Стоповый байт
     frame[pos++] = 0xFE;
 
-    return m_phys.send(frame, pos);
+    bool result = m_phys.send(frame, pos);
+    std::free(frame);
+    return result;
 }
 
 bool Channels::poll(uint8_t* out, uint16_t outSize, uint16_t* outLen, uint32_t timeoutMs) {
