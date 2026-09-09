@@ -2,11 +2,25 @@
 
 #include <cstdint>
 
+/**
+ * @brief Абстрактный класс физического уровня протокола.
+ * 
+ * Определяет интерфейс для работы со средой передачи данных.
+ * Реализация зависит от платформы (например, PhysicsForWin для Windows).
+ */
 class Physics {
 public:
     virtual ~Physics() = default;
     
+    /**
+     * @brief Инициализация физического уровня.
+     * @return true при успешной инициализации.
+     */
     virtual bool init() = 0;
+    
+    /**
+     * @brief Деинициализация и освобождение ресурсов.
+     */
     virtual void deinit() = 0;
     
     /**
@@ -26,6 +40,9 @@ public:
      */
     virtual uint16_t recv(uint8_t* data, uint16_t maxSize, uint32_t timeoutMs) = 0;
 
+    /**
+     * @brief Обновление состояния соединения и обработка операций чтения/записи.
+     */
     virtual void update() = 0;
     
     /**

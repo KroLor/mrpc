@@ -9,45 +9,104 @@ extern "C" {
     #include "semphr.h"
 }
 
-// Типы сообщений (байт 0 сообщения транспортного уровня)
+/**
+ * @brief Типы сообщений транспортного уровня.
+ */
 enum class MsgType : uint8_t {
-    Request = 0x0B,
-    Stream = 0x0C,
-    Response = 0x16,
-    Error = 0x21
+    Request = 0x0B,   ///< Запрос на выполнение удаленной функции
+    Stream = 0x0C,    ///< Запрос на потоковую передачу данных
+    Response = 0x16,  ///< Ответ от сервера
+    Error = 0x21      ///< Сообщение об ошибке
 };
 
+/**
+ * @brief Статус выполнения вызова удаленной процедуры.
+ */
 enum class CallStatus {
-    Success = 0,
-    Timeout,
-    InvalidArgs,
-    RemoteError,
-    ChannelDown,
-    Error
+    Success = 0,      ///< Успешное выполнение
+    Timeout,          ///< Превышен таймаут ожидания
+    InvalidArgs,      ///< Неверные аргументы
+    RemoteError,      ///< Ошибка на удаленной стороне
+    ChannelDown,      ///< Канал связи неактивен
+    Error             ///< Общая ошибка
 };
 
+/**
+ * @brief Тип обработчика зарегистрированной функции.
+ * @param args Входные аргументы.
+ * @param argsLen Длина входных аргументов.
+ * @param out Буфер для выходных данных.
+ * @param outLen Длина выходных данных.
+ * @return true при успешном выполнении.
+ */
 using RpcHandler = bool (*)(const uint8_t* args, uint16_t argsLen, uint8_t* out, uint16_t* outLen);
+
+/**
+ * @brief Тип колбэка для потоковой передачи данных.
+ * @param data Принятые данные.
+ * @param len Длина данных.
+ */
 using StreamCallback = void (*)(const uint8_t* data, uint16_t len);
 
+/**
+ * @brief Класс транспортного уровня протокола MRPC.
+ * 
+ * Реализует логику RPC: регистрацию функций, выполнение вызовов (call),
+ * потоковую передачу (stream) и обработку ответов. Использует семафоры
+ * FreeRTOS для синхронизации задач.
+ */
 class Transport {
 public:
+    /**
+     * @brief Конструктор с привязкой к канальному уровню.
+     * @param channels Ссылка на объект канального уровня.
+     */
     Transport(Channels& channels);
 
+    /**
+     * @brief Регистрация удаленной функции.
+     * @param name Имя функции.
+     * @param handler Указатель на функцию-обработчик.
+     * @return true при успешной регистрации.
+     */
     bool regFunc(const char* name, RpcHandler handler);
 
+    /**
+     * @brief Выполнение удаленного вызова с ожиданием ответа.
+     * @param name Имя удаленной функции.
+     * @param args Аргументы вызова.
+     * @param argsLen Длина аргументов.
+     * @param out Буфер для записи ответа.
+     * @param outLen Размер буфера / полученная длина ответа.
+     * @param timeoutMs Таймаут ожидания в миллисекундах.
+     * @return Код статуса выполнения.
+     */
     CallStatus call(const char* name,
                     const uint8_t* args, uint16_t argsLen,
                     uint8_t* out, uint16_t* outLen,
                     uint32_t timeoutMs);
 
+    /**
+     * @brief Запуск потоковой передачи данных.
+     * @param name Имя удаленной функции.
+     * @param args Аргументы вызова.
+     * @param argsLen Длина аргументов.
+     * @param Chunk Колбэк для обработки чанков данных.
+     * @param stepTimeoutMs Таймаут ожидания каждого чанка.
+     * @return Код статуса выполнения.
+     */
     CallStatus stream(const char* name, const uint8_t* args, uint16_t argsLen, StreamCallback Chunk, uint32_t stepTimeoutMs);
 
-    // 0x16 - разбудить висящий call() с совпавшим N
-    // 0x0B/0x0C - поиск в реестре, вызов, отправка ответ/ошибка
-    // true - за итерацию обработано сообщение
+    /**
+     * @brief Обработка одного входящего сообщения.
+     * @param timeoutMs Таймаут ожидания данных.
+     * @return true если за итерацию было обработано сообщение.
+     */
     bool dispatchOnce(uint32_t timeoutMs);
 
-    // (обрыв линии)
+    /**
+     * @brief Уведомление об обрыве соединения.
+     */
     void linkDown();
 
 private:
