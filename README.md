@@ -4,12 +4,20 @@
 Для тестирования протокола на Windows используется асинхронный (`FILE_FLAG_OVERLAPPED`) и двунаправленный (`PIPE_ACCESS_DUPLEX`) канал Named Pipe, передающий поток байт.
 Далее рассматривается интерфейс и реализация протокола, получившего название MRPC.
 
+Запуск:
+* Сервер: `./mrpc.exe` (или без аргументов)
+* Клиент: `./mrpc.exe client`
+
+Имя канала по умолчанию: `mrpc_pipe`.
+
 ## Физический уровень
 
 На этом уровне объявлен абстрактный класс `Physics`. Для каждой среды его реализация будет уникальной; например, для Windows это класс `PhysicsForWin`.
 Интерфейс этого уровня, помимо прочих методов, обязан реализовывать методы `send`, `recv` и `update`.
 * Методы `send` и `recv` отвечают за отправку и прием байтов (через указатель на начало данных и их длину) соответственно.
 * Метод `update` обрабатывает состояния соединения и выполняет запись или чтение в специфичной для среды реализации через буферы с учетом роли устройства.
+
+Для Windows реализация использует асинхронный (`FILE_FLAG_OVERLAPPED`) и двунаправленный (`PIPE_ACCESS_DUPLEX`) канал Named Pipe. Класс `PhysicsForWin` содержит объекты `PipeServer` (для режима сервера) или `PipeClient` (для режима клиента), которые управляют подключением и передачей данных. Буферы чтения/записи размером 512 байт используются для асинхронных операций.
 
 Таким образом, протокол не навязывает распределение ролей и конкретную реализацию физического уровня, но требует от него быстрой работы с данными через указатели, что обеспечивается использованием буферов. Класс `PhysicsForWin` как раз использует такой подход.
 
@@ -32,7 +40,39 @@
 
 С этим уровнем работает пользователь. Интерфейс состоит из методов инициализации физического уровня (и деинициализации), регистрации функций, а также вызова `call` и `stream`. Интерфейс «знает» обо всех звеньях протокола (для физического уровня необходимо написать свою реализацию и передать её при создании объекта класса `App`). Также предусмотрены методы создания пользовательских задач, после чего вызов `vTaskStartScheduler` запустит работу протокола. Задача чтения создается при инициализации через метод `start`.
 
-Цикл чтения (высший приоритет):
+Пример использования на стороне сервера:
+
+```cpp
+// Тестовая функция "эхо"
+bool rpcEcho(const uint8_t* args, uint16_t argsLen, uint8_t* out, uint16_t* outLen) {
+    if (*outLen < argsLen) return false; 
+    memcpy(out, args, argsLen);
+    *outLen = argsLen;
+    return true;
+}
+
+// Тестовая функция "сумма"
+bool rpcSum(const uint8_t* args, uint16_t argsLen, uint8_t* out, uint16_t* outLen) {
+    if (*outLen < sizeof(int)) return false;
+    int a, b;
+    memcpy(&a, args, sizeof(int));
+    memcpy(&b, args + sizeof(int), sizeof(int));
+    int result = a + b;
+    memcpy(out, &result, sizeof(int));
+    *outLen = sizeof(result);
+    return true;
+}
+
+// В main():
+PhysicsForWin phys("mrpc_pipe", true); // сервер
+App app(phys);
+app.start();
+app.regFunc("echo", rpcEcho);
+app.regFunc("sum", rpcSum);
+vTaskStartScheduler();
+```
+
+Цикл чтения (приоритет 2 по умолчанию):
 
 ```cpp
 void App::rxLoop() {
@@ -53,7 +93,7 @@ void App::rxLoop() {
 }
 ```
 
-Цикл чтения имеет второй приоритет, тогда как пользовательские задачи `call` и `stream` по умолчанию имеют приоритет 1:
+Цикл чтения имеет приоритет 2 (по умолчанию), тогда как пользовательские задачи `call` и `stream` по умолчанию имеют приоритет 1:
 
 ```cpp
 bool createClientTask(ClientTaskFunc taskFunc,
@@ -69,7 +109,57 @@ bool createClientStreamTask(ClientTaskFunc taskFunc,
 
 Это сделано для того, чтобы планировщик, запускаемый после настройки приложения программистом, всегда проверял наличие пакетов и выполнял `call` или `stream` только при необходимости. Вызов `vTaskDelay(pdMS_TO_TICKS(1))` дает возможность выполниться задачам с более низким приоритетом пока нет новых целых пакетов. Именно в этих пользовательских задачах подразумевается вызов `call` или `stream`. Вызывать эти методы можно и вне пользовательской задач, но по заданию было необходимо «создать задачу приема сообщений». Это возможно, потому что логика обработки этих методов основана на семафорах и не зависит от задачи, в которой вызывается.
 
-Пользовательские задачи обязательно нужно удалять, поэтому предусмотрен метод `stop`. После его вызова программист может продолжить работу с полученными данными от удаленных функций, «забыв» про физический уровень, деинициализация которого также происходит внутри метода.
+Пример использования на стороне клиента:
+
+```cpp
+void clientTask(void* param) {
+    App& app = *static_cast<App*>(param);
+    
+    const char* msg1 = "Hello World!";
+    uint8_t resp1[64];
+    uint16_t respLen1 = sizeof(resp1);
+
+    int a = 10, b = 25;
+    uint8_t argsBuf[2 * sizeof(int)];
+    memcpy(argsBuf, &a, sizeof(int));
+    memcpy(argsBuf + sizeof(int), &b, sizeof(int));
+    int result = 0;
+    uint16_t respLen = sizeof(result);
+
+    for (;;) {
+        // Вызываем удаленную функцию echo
+        CallStatus status1 = app.call("echo", (const uint8_t*)msg1, strlen(msg1), resp1, &respLen1, 1000);
+        if (status1 == CallStatus::Success) {
+            std::cout << "[Client] Success: " << std::string((char*)resp1, respLen1) << std::endl;
+        }
+        vTaskDelay(pdMS_TO_TICKS(2000));
+
+        // Вызываем удаленную функцию sum
+        CallStatus status2 = app.call("sum", argsBuf, sizeof(argsBuf), (uint8_t*)&result, &respLen, 1000);
+        if (status2 == CallStatus::Success && respLen == sizeof(int)) {
+            std::cout << "[Client] Result: " << result << std::endl;
+        }
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
+
+// Обработчик чанка стрима
+void StreamChunk(const uint8_t* data, uint16_t len) {
+    std::cout << "[Client] Stream: " << std::string((const char*)data, len) << std::endl;
+}
+
+void clientTaskStream(void* param) {
+    App& app = *static_cast<App*>(param);
+    const char* msg = "Hello World! _Stream";
+    for (;;) {
+        CallStatus status = app.stream("echo", (const uint8_t*)msg, strlen(msg), StreamChunk, 3000);
+        std::cout << "[Client] Stream finished, status: " << static_cast<int>(status) << std::endl;
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
+```
+
+Пользовательские задачи обязательно нужно удалять, поэтому предусмотрен метод `stop`. После его вызова программист может продолжить работу с полученными данными от удаленных функций, «забыв» про физический уровень, деинициализация которого также происходит внутри метода. Метод `stop()` удаляет задачу чтения и все созданные пользовательские задачи.
 
 Стоит отметить, что для стрима в метод передается функция, которая вызывается в цикле стрима на уровне приложения и принимает указатель на данные и их длину. При этом параметры удаленной функции передаются только один раз в начале стрима:
 
