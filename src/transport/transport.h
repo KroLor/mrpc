@@ -154,4 +154,5 @@ private:
     uint16_t m_streamLastLen = 0;
     CallStatus m_streamStatus = CallStatus::Error;
     bool m_streamDataReady = false;
+    bool m_streamEnded = false;
 };

@@ -13,7 +13,8 @@ Transport::Transport(Channels& channels) :
     m_seq(0) {
     // Бинарный семафор для ожидания ответа
     m_waitSem = xSemaphoreCreateBinary();
-    m_streamSem = xSemaphoreCreateBinary();
+    // Счетный семафор для потоковой передачи (максимум 10 сообщений в буфере)
+    m_streamSem = xSemaphoreCreateCounting(10, 0);
 }
 
 bool Transport::regFunc(const char* name, RpcHandler handler) {
@@ -77,6 +78,7 @@ CallStatus Transport::stream(const char* name, const uint8_t* args, uint16_t arg
     m_streamSeq = ++m_seq;
     m_streamStatus = CallStatus::Timeout;
     m_streamLastLen = 0;
+    m_streamEnded = false;
     
     // Отправляем stream-запрос (0x0C)
     if (!sendMsg(MsgType::Stream, m_streamSeq, name, args, argsLen)) {
@@ -89,10 +91,15 @@ CallStatus Transport::stream(const char* name, const uint8_t* args, uint16_t arg
             m_streamStatus = CallStatus::Timeout;
             break;
         }
-        if (m_streamDataReady) {
-            m_streamDataReady = false;
-            if (Chunk) Chunk(m_streamLastBuf, m_streamLastLen);
-            continue;
+        // Проверяем, не пришел ли конец стрима (Response/Error)
+        if (m_streamEnded) {
+            break;
+        }
+
+        // Обрабатываем данные стрима
+        if (Chunk && m_streamLastLen > 0) {
+            Chunk(m_streamLastBuf, m_streamLastLen);
+            m_streamLastLen = 0;
         }
         break;
     }
@@ -126,6 +133,7 @@ bool Transport::dispatchOnce(uint32_t timeoutMs) {
         if (m_streamBusy && seq == m_streamSeq) {
             m_streamStatus = (type == MsgType::Response) ? CallStatus::Success : CallStatus::RemoteError;
             m_streamDataReady = false;
+            m_streamEnded = true;
             xSemaphoreGive(m_streamSem);
         }
         else {
@@ -147,12 +155,13 @@ void Transport::linkDown() {
         m_waitStatus = CallStatus::ChannelDown;
         m_waitGot = 0;
         // Принудительно будим задачу, которая ждет в call()
-        xSemaphoreGive(m_waitSem); 
+        xSemaphoreGive(m_waitSem);
     }
 
     if (m_streamBusy) {
         m_streamStatus = CallStatus::ChannelDown;
         m_streamDataReady = false;
+        m_streamEnded = true;
         xSemaphoreGive(m_streamSem);
     }
 }
